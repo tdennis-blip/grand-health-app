@@ -1,0 +1,34 @@
+# AWS Amplify Hosting build spec for a Next.js (App Router) site.
+#
+# In the Amplify console:
+#   1. Connect this repo.
+#   2. Set the app root to `grand-health-app` if the prototype is in the same repo.
+#   3. Add environment variables under "Environment variables":
+#        NEXT_PUBLIC_SUPABASE_URL
+#        NEXT_PUBLIC_SUPABASE_ANON_KEY
+#        DATABASE_URL              (pooled)
+#        DIRECT_DATABASE_URL       (direct — only needed for migrations)
+#        SUPABASE_SERVICE_ROLE_KEY (admin tasks)
+#        NEXT_PUBLIC_SITE_URL      (the Amplify domain)
+#   4. Make sure the build image is Node 20+.
+
+version: 1
+applications:
+  - appRoot: .
+    frontend:
+      phases:
+        preBuild:
+          commands:
+            - corepack enable || true
+            - npm ci --legacy-peer-deps
+        build:
+          commands:
+            - npm run build
+      artifacts:
+        baseDirectory: .next
+        files:
+          - "**/*"
+      cache:
+        paths:
+          - node_modules/**/*
+          - .next/cache/**/*

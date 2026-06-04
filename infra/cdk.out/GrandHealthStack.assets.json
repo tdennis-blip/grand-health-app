@@ -1,0 +1,21 @@
+{
+  "version": "53.0.0",
+  "files": {
+    "43bb534c3a633b2ac579d292eefb942168c2972b69304e757b1d360b8baed1fb": {
+      "displayName": "GrandHealthStack Template",
+      "source": {
+        "path": "GrandHealthStack.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "669960694177-us-east-1-96eae9cc": {
+          "bucketName": "cdk-hnb659fds-assets-669960694177-us-east-1",
+          "objectKey": "43bb534c3a633b2ac579d292eefb942168c2972b69304e757b1d360b8baed1fb.json",
+          "region": "us-east-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::669960694177:role/cdk-hnb659fds-file-publishing-role-669960694177-us-east-1"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}
