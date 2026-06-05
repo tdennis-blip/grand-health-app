@@ -13,8 +13,8 @@
 do $$
 declare
   v_clinic_id uuid := '00000000-0000-0000-0000-000000000001';
-  v_clinician_id uuid := '11111111-1111-1111-1111-111111111111';  -- REPLACE
-  v_patient_id   uuid := '22222222-2222-2222-2222-222222222222';  -- REPLACE
+  v_clinician_id uuid := 'b4782468-3011-700c-6afb-4152435fba1d';
+  v_patient_id   uuid := '34f814a8-1041-70e3-0f7f-c1c63a01f49a';
   v_cv_pillar uuid;
   v_metabolic_pillar uuid;
 begin

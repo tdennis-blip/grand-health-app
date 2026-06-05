@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { Home, ShieldAlert, Trophy, MessageSquare, User } from "lucide-react";
 
 const TABS = [
-  { href: "/home",          label: "Today",     Icon: Home,         match: (p: string) => p === "/home" || p.startsWith("/home/training") },
+  { href: "/home",          label: "Today",     Icon: Home,         match: (p: string) => p === "/home" || p.startsWith("/home/training") || p.startsWith("/home/appointments") || p.startsWith("/home/diet") || p.startsWith("/home/sleep") },
   { href: "/home/pillars",  label: "Pillars",   Icon: ShieldAlert,  match: (p: string) => p.startsWith("/home/pillars") },
   { href: "/home/grand100", label: "Grand 100", Icon: Trophy,       match: (p: string) => p.startsWith("/home/grand100") },
   { href: "/home/chat",     label: "Chat",      Icon: MessageSquare,match: (p: string) => p.startsWith("/home/chat") },

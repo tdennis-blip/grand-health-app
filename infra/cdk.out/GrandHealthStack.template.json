@@ -795,6 +795,30 @@
     "aws:cdk:path": "GrandHealthStack/DbSg/Resource"
    }
   },
+  "DbSgfromGrandHealthStackBastionSgF1303A48543232F18518": {
+   "Type": "AWS::EC2::SecurityGroupIngress",
+   "Properties": {
+    "Description": "Bastion to Postgres",
+    "FromPort": 5432,
+    "GroupId": {
+     "Fn::GetAtt": [
+      "DbSg495F8305",
+      "GroupId"
+     ]
+    },
+    "IpProtocol": "tcp",
+    "SourceSecurityGroupId": {
+     "Fn::GetAtt": [
+      "BastionSg3D6BE75A",
+      "GroupId"
+     ]
+    },
+    "ToPort": 5432
+   },
+   "Metadata": {
+    "aws:cdk:path": "GrandHealthStack/DbSg/from GrandHealthStackBastionSgF1303A48:5432"
+   }
+  },
   "PostgresSubnetGroup9F8A4D6E": {
    "Type": "AWS::RDS::DBSubnetGroup",
    "Properties": {
@@ -952,6 +976,151 @@
    "DeletionPolicy": "Snapshot",
    "Metadata": {
     "aws:cdk:path": "GrandHealthStack/Postgres/Resource"
+   }
+  },
+  "BastionRole201D3308": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "ec2.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/AmazonSSMManagedInstanceCore"
+       ]
+      ]
+     }
+    ],
+    "Tags": [
+     {
+      "Key": "PHI",
+      "Value": "true"
+     },
+     {
+      "Key": "Project",
+      "Value": "GrandHealth"
+     },
+     {
+      "Key": "Stage",
+      "Value": "staging"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "GrandHealthStack/BastionRole/Resource"
+   }
+  },
+  "BastionSg3D6BE75A": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "Grand Health bastion - SSM only, no inbound ports needed",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow all outbound traffic by default",
+      "IpProtocol": "-1"
+     }
+    ],
+    "Tags": [
+     {
+      "Key": "PHI",
+      "Value": "true"
+     },
+     {
+      "Key": "Project",
+      "Value": "GrandHealth"
+     },
+     {
+      "Key": "Stage",
+      "Value": "staging"
+     }
+    ],
+    "VpcId": {
+     "Ref": "Vpc8378EB38"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "GrandHealthStack/BastionSg/Resource"
+   }
+  },
+  "BastionInstanceProfile95B62D1E": {
+   "Type": "AWS::IAM::InstanceProfile",
+   "Properties": {
+    "Roles": [
+     {
+      "Ref": "BastionRole201D3308"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "GrandHealthStack/Bastion/InstanceProfile"
+   }
+  },
+  "Bastion2B4CEC30": {
+   "Type": "AWS::EC2::Instance",
+   "Properties": {
+    "AvailabilityZone": "us-east-1a",
+    "IamInstanceProfile": {
+     "Ref": "BastionInstanceProfile95B62D1E"
+    },
+    "ImageId": {
+     "Ref": "SsmParameterValueawsserviceamiamazonlinuxlatestal2023amikernel61x8664C96584B6F00A464EAD1953AFF4B05118Parameter"
+    },
+    "InstanceType": "t3.nano",
+    "SecurityGroupIds": [
+     {
+      "Fn::GetAtt": [
+       "BastionSg3D6BE75A",
+       "GroupId"
+      ]
+     }
+    ],
+    "SubnetId": {
+     "Ref": "VpcpublicSubnet1Subnet2BB74ED7"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "GrandHealthStack/Bastion"
+     },
+     {
+      "Key": "PHI",
+      "Value": "true"
+     },
+     {
+      "Key": "Project",
+      "Value": "GrandHealth"
+     },
+     {
+      "Key": "Stage",
+      "Value": "staging"
+     }
+    ],
+    "UserData": {
+     "Fn::Base64": "#!/bin/bash"
+    }
+   },
+   "DependsOn": [
+    "BastionRole201D3308"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "GrandHealthStack/Bastion/Resource"
    }
   },
   "DbEndpoint7CDA2A80": {
@@ -1134,14 +1303,34 @@
   "CDKMetadata": {
    "Type": "AWS::CDK::Metadata",
    "Properties": {
-    "Analytics": "v2:deflate64:H4sIAAAAAAAA/2VRy27CMBD8Fu7GpVFRzxQqxKWNEsq12phtaoht5F2DUOR/r0wgQfQ0T61Gdiaz6aucjOBEY7XdjxtdybZkUHsBJ/puUWWy3RyUmP/YTT4XeagarcpQWeTkDaxwgXENVYODP3gzIqc0sHa2LyfyvsoTfAAvgfEEZ5F7fQTG4fDKMnqLfaFbclUzZlC/Bi2LElXwms9L78LhsuHeiIJQeWQyYKFGL9vyoq/FxDpYg6+R7+72hcckCr8l2S6AoQLClSUGq1B00/sZi7d/xq0ahQYj28J1j5YwCiKTvsBrW+fgwSCjT2kvolCutpqdbL8Ife5ck/Ke38i80df9D85NLpwBbe8LnROjKJBc8Ooy6zPwIXAU1m1R7ujpmL3I56mcjHak9dgHy9qgLDr8A+XCA7pRAgAA"
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/31RwW7CMAz9lt1DxqqhnRlMqJetahnXyQ2mC7QJchwQqvrvUwi0jEk7+b3np/jZSWQyeZHjBzi6kVrvRrUuZVswqJ2Ao/tqUSWyXe2VmG3MKpuJzJe1VoUvDXLQBpRbz7iEssZBH7Spc1ZpYG1Nbw7gLc1CeQdeAOMRTiIjfQDG4eHUMJLB3hCTXNiUGdR3g4ZFgcqT5tOCrN+fM/wrpKYidE6kxjEYhXFUxJ1wqAjZNWCgQpJtceaXRwKKZQlUId+E6A33nU7Q2sl2DgwlOOynxj37iPPXP8IQSkMj29zGC1/rtZ2R3eg6RHdN+ELSpsqAoEFGCsaedELZymi2sv10SJm1dej3+Apmtb6sdKdc6dw2oM2tISpdJ3J01lO86q8UH573njth7Brl1j0ekmf5NJHjh63TekTesG5Q5rH+ADKXAxmeAgAA"
    },
    "Metadata": {
     "aws:cdk:path": "GrandHealthStack/CDKMetadata/Default"
    }
   }
  },
+ "Parameters": {
+  "SsmParameterValueawsserviceamiamazonlinuxlatestal2023amikernel61x8664C96584B6F00A464EAD1953AFF4B05118Parameter": {
+   "Type": "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>",
+   "Default": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64"
+  },
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
  "Outputs": {
+  "BastionInstanceId": {
+   "Description": "Use with: aws ssm start-session --target <this-id> --document-name AWS-StartPortForwardingSessionToRemoteHost ...",
+   "Value": {
+    "Ref": "Bastion2B4CEC30"
+   },
+   "Export": {
+    "Name": "GrandHealth-staging-BastionInstanceId"
+   }
+  },
   "UserPoolId": {
    "Value": {
     "Ref": "UserPool6BA7E5F2"
@@ -1173,13 +1362,6 @@
    "Export": {
     "Name": "GrandHealth-staging-VpcId"
    }
-  }
- },
- "Parameters": {
-  "BootstrapVersion": {
-   "Type": "AWS::SSM::Parameter::Value<String>",
-   "Default": "/cdk-bootstrap/hnb659fds/version",
-   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
   }
  },
  "Rules": {

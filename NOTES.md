@@ -18,10 +18,11 @@ Living orientation doc for the production app. **Read this first** when picking 
 | Forms validation | Zod |
 | Infrastructure | AWS CDK v2 (`infra/` directory) |
 
-**Supabase has been removed.** The `@supabase/ssr` / `@supabase/supabase-js` packages
-are no longer used. `src/lib/supabase/server.ts` still exports `createClient()` as
-a compatibility shim backed by postgres-js + the Cognito auth layer — this keeps
-all 80+ callsites unchanged while the migration completes.
+**Supabase has been fully removed.** `@supabase/ssr` and `@supabase/supabase-js` are not
+in `package.json` and have no live imports. The compatibility shim (`src/lib/supabase/server.ts`,
+`src/lib/db/query-builder.ts`) and dead browser client (`src/lib/supabase/client.ts`) are
+tombstone stubs — do not import from them. All queries now use `withAuth` + `serviceRoleSql`
+from `@/lib/db/connection` directly.
 
 **HIPAA coverage:** All data lives in AWS services covered by the AWS BAA. No
 third-party HIPAA add-on fees.
@@ -294,19 +295,32 @@ using (
 
 **Zod schemas at the top of every action file** validate inputs before the DB call. Reject early.
 
-**Drizzle is wired up but we mostly use the Supabase client** for queries. Drizzle is there for the day we want typed joins or schema-driven migrations. The SQL migrations in `supabase/migrations/` are the source of truth for the schema — Drizzle's `schema.ts` mirrors them but doesn't generate them.
+**All queries use `withAuth` or `serviceRoleSql` directly** — no ORM, no shim. Pattern:
+```typescript
+import { requireUser } from "@/lib/auth/server";       // or requireClinician / requirePatient
+import { withAuth, serviceRoleSql } from "@/lib/db/connection";
+
+const user = await requireUser();
+const rows = await withAuth(user, (sql) =>
+  sql`SELECT id, name FROM table WHERE patient_id = ${user.id}`
+);
+```
+Use `serviceRoleSql` for cron jobs, webhook handlers, and audit writes (bypasses RLS). Use `withAuth` for all user-scoped queries (sets `app.current_user_id/role/clinic_id` session vars that RLS policies read).
+
+Drizzle is wired up (`src/lib/db/index.ts`) but not used for queries — it's there for future typed schema work. The SQL migrations in `supabase/migrations/` are the source of truth for the schema.
 
 **Tailwind: no dynamic class names.** The JIT compiler can't see `bg-${color}-500` style strings. Use literal classes everywhere.
 
-**Numeric columns in Postgres come back as strings from `@supabase/supabase-js`.** Numeric fields in `schema.ts` are typed as `text` and the app converts. Don't try to make Drizzle treat them as numbers — it loses precision.
+**Numeric columns in Postgres come back as strings through postgres-js.** Use `Number(r.col)` to convert. Don't rely on automatic coercion.
 
 ---
 
 ## Auth + role gating
 
-- Magic-link login at `/login` (default tab) + password sign-in (added because Supabase free-tier email is rate-limited; dev users get passwords set via SQL).
-- `src/middleware.ts` redirects unauthenticated users to `/login`, and routes signed-in users to `/clinician/dashboard` or `/home` based on their `profiles.role`.
-- Patient layouts (`/home/*`) reject clinicians and vice versa.
+- Login at `/login` — password sign-in via Cognito. Magic-link removed (was Supabase-only).
+- Auth layer: `src/lib/auth/server.ts` — `getUser()` / `requireUser()` / `requireClinician()` / `requirePatient()`. Reads Cognito JWT from `gh_id_token` cookie (set at `/auth/callback`).
+- `src/lib/auth/middleware.ts` — verifies JWT via JWKS on every request, redirects unauthenticated users to `/login`, sends logged-in users to role-appropriate home.
+- Patient layouts (`/home/*`) call `requirePatient()`. Clinician layouts call `requireClinician()`.
 
 ---
 
@@ -315,6 +329,31 @@ using (
 Run them in numeric order in the Supabase SQL Editor when bootstrapping a fresh project. They're additive and idempotent (where applicable they use `drop policy if exists` / `add column if not exists`).
 
 Then `supabase/seed.sql` for synthetic data (replace the two placeholder UUIDs with real `auth.users.id` values you've invited).
+
+---
+
+## Git / GitHub
+
+Repo: `https://github.com/tdennis-blip/grand-health-app`
+
+Day-to-day workflow — before switching machines:
+```bash
+git add .
+git commit -m "what you did"
+git push
+```
+When sitting down at another machine: `git pull`.
+
+---
+
+## Tombstone files (do not import from these)
+
+These files exist only to preserve git history — they export nothing:
+- `src/lib/supabase/server.ts` — was the SupabaseCompat shim
+- `src/lib/db/query-builder.ts` — was the SupabaseCompat + SupaQuery classes
+- `src/lib/supabase/client.ts` — was the browser Supabase client
+- `src/lib/supabase/middleware.ts` — was the Supabase session middleware
+- `src/lib/wearables/admin-client.ts` — was the service-role Supabase client
 
 ---
 
@@ -424,7 +463,7 @@ unaffected.
 
 When adding a new patient-side view that reads PHI:
 
-1. Server component does the fetch via `createClient()` from `@/lib/supabase/server`. RLS handles scoping.
+1. Server component calls `requirePatient()` to get `user`, then fetches with `withAuth(user, sql => sql\`...\`)`. RLS handles scoping.
 2. Pull related data in parallel with `Promise.all([...])`.
 3. Pass shaped data into a small client component for any interactivity.
 4. Add a route + tab if it needs navigation.
@@ -448,5 +487,6 @@ When adding a new SQL migration:
 
 - For unclear visual / behavioural intent → look at `../grandhealth-prototype.jsx`. It's one giant JSX file but every feature lives there.
 - For unclear data shapes → look at the relevant migration file in `supabase/migrations/`.
-- For unclear auth patterns → look at `0002_rls_policies.sql` and `src/lib/audit.ts`.
+- For unclear auth patterns → look at `src/lib/auth/server.ts`, `src/lib/db/connection.ts`, and `0002_rls_policies.sql`.
+- For unclear query patterns → look at any recent actions file, e.g. `src/app/home/diet/entry-actions.ts`.
 - For unclear deployment → `README.md` + `amplify.yml`.

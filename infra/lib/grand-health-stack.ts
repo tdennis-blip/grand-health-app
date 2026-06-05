@@ -4,6 +4,7 @@ import * as rds from "aws-cdk-lib/aws-rds";
 import * as cognito from "aws-cdk-lib/aws-cognito";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as ssm from "aws-cdk-lib/aws-ssm";
+import * as iam from "aws-cdk-lib/aws-iam";
 import { Construct } from "constructs";
 
 interface GrandHealthStackProps extends cdk.StackProps {
@@ -75,6 +76,48 @@ export class GrandHealthStack extends cdk.Stack {
       monitoringInterval: cdk.Duration.seconds(60),
       enablePerformanceInsights: true,
       performanceInsightRetention: rds.PerformanceInsightRetention.DEFAULT,
+    });
+
+    // ── Bastion host (SSM-only, no SSH keys) ─────────────────────────────────
+    // Used by developers to tunnel to RDS from their laptops via:
+    //   aws ssm start-session --target <instance-id> \
+    //     --document-name AWS-StartPortForwardingSessionToRemoteHost \
+    //     --parameters '{"host":["<rds-endpoint>"],"portNumber":["5432"],"localPortNumber":["5432"]}'
+    // Then connect TablePlus to localhost:5432.
+    const bastionRole = new iam.Role(this, "BastionRole", {
+      assumedBy: new iam.ServicePrincipal("ec2.amazonaws.com"),
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSSMManagedInstanceCore"),
+      ],
+    });
+
+    const bastionSg = new ec2.SecurityGroup(this, "BastionSg", {
+      vpc,
+      description: "Grand Health bastion - SSM only, no inbound ports needed",
+      allowAllOutbound: true,
+    });
+
+    const bastion = new ec2.Instance(this, "Bastion", {
+      vpc,
+      vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
+      instanceType: ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.NANO),
+      machineImage: ec2.MachineImage.latestAmazonLinux2023(),
+      securityGroup: bastionSg,
+      role: bastionRole,
+      // No key pair — access only via SSM Session Manager
+    });
+
+    // Allow bastion → RDS
+    dbSg.addIngressRule(
+      bastionSg,
+      ec2.Port.tcp(5432),
+      "Bastion to Postgres"
+    );
+
+    new cdk.CfnOutput(this, "BastionInstanceId", {
+      value: bastion.instanceId,
+      exportName: `GrandHealth-${stage}-BastionInstanceId`,
+      description: "Use with: aws ssm start-session --target <this-id> --document-name AWS-StartPortForwardingSessionToRemoteHost ...",
     });
 
     // Store connection info in SSM for the app to read.
