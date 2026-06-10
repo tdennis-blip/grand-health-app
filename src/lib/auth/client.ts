@@ -15,7 +15,6 @@ export function configureAmplify() {
     {
       Auth: {
         Cognito: {
-          region: cognitoConfig.region,
           userPoolId: cognitoConfig.userPoolId,
           userPoolClientId: cognitoConfig.clientId,
           loginWith: {

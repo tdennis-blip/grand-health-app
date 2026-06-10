@@ -67,7 +67,7 @@ export async function requireUser(): Promise<AuthUser> {
     const { redirect } = await import("next/navigation");
     redirect("/login");
   }
-  return user;
+  return user as AuthUser;
 }
 
 export async function requireClinician(): Promise<AuthUser> {

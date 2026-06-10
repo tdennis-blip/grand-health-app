@@ -40,3 +40,6 @@ drizzle/migrations/meta
 # Capacitor native projects (regenerate with npm run cap:init)
 ios/
 android/
+
+# scratch typecheck config (sandbox-generated, do not commit)
+tsconfig.check.json

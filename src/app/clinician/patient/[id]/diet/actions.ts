@@ -36,7 +36,7 @@ export async function upsertDietPlan(input: z.infer<typeof dietSchema>) {
     sql`SELECT * FROM diet_plans WHERE patient_id = ${parsed.patientId} LIMIT 1`
   );
 
-  await withAuth(user, (sql) =>
+  const [row] = await withAuth(user, (sql) =>
     sql`
       INSERT INTO diet_plans (patient_id, clinic_id, rmr_value, rmr_method, rmr_measured_on, rmr_measured_by,
         activity_multiplier, deficit_kcal, protein_per_kg, carbs_pct, fat_pct, fiber_g, meals_per_day, water_l, notes, updated_at)
@@ -52,6 +52,7 @@ export async function upsertDietPlan(input: z.infer<typeof dietSchema>) {
         protein_per_kg = EXCLUDED.protein_per_kg, carbs_pct = EXCLUDED.carbs_pct, fat_pct = EXCLUDED.fat_pct,
         fiber_g = EXCLUDED.fiber_g, meals_per_day = EXCLUDED.meals_per_day, water_l = EXCLUDED.water_l,
         notes = EXCLUDED.notes, updated_at = EXCLUDED.updated_at
+      RETURNING *
     `
   );
 

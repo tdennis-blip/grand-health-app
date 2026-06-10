@@ -29,7 +29,7 @@ export async function upsertGrand100Baseline(input: z.infer<typeof baselineSchem
     sql`SELECT * FROM grand100_baselines WHERE patient_id = ${parsed.patientId} LIMIT 1`
   );
 
-  await withAuth(user, (sql) =>
+  const [row] = await withAuth(user, (sql) =>
     sql`
       INSERT INTO grand100_baselines (patient_id, clinic_id, vo2_now, grip_kg, squat_1rm_lb, strength_percentile, mobility_percentile, measured_on, updated_at)
       VALUES (${parsed.patientId}, ${patient.clinic_id}, ${parsed.vo2Now ?? null}, ${parsed.gripKg ?? null},
@@ -39,6 +39,7 @@ export async function upsertGrand100Baseline(input: z.infer<typeof baselineSchem
         clinic_id = EXCLUDED.clinic_id, vo2_now = EXCLUDED.vo2_now, grip_kg = EXCLUDED.grip_kg,
         squat_1rm_lb = EXCLUDED.squat_1rm_lb, strength_percentile = EXCLUDED.strength_percentile,
         mobility_percentile = EXCLUDED.mobility_percentile, measured_on = EXCLUDED.measured_on, updated_at = EXCLUDED.updated_at
+      RETURNING *
     `
   );
 

@@ -122,7 +122,7 @@ export default async function ClinicianAuditLogPage({
 
   // Build dynamic WHERE conditions as arrays, then join with AND.
   const conditions: string[] = ["1=1"];
-  const bindings: unknown[] = [];
+  const bindings: any[] = [];
   let bi = 1; // binding index tracker
 
   if (params.action) { conditions.push(`action = $${bi++}`); bindings.push(params.action); }
@@ -160,8 +160,8 @@ export default async function ClinicianAuditLogPage({
     ),
   ]);
 
-  const rows = rawRows as AuditRow[];
-  const error = null;
+  const rows = rawRows as unknown as AuditRow[];
+  const error = null as { message: string } | null;
 
   // Bulk-load profile names for actor + patient ids on the visible page.
   const ids = new Set<string>();
@@ -175,7 +175,7 @@ export default async function ClinicianAuditLogPage({
     const profiles = await withAuth(user, (sql) =>
       sql`SELECT id, email, first_name, last_name, role FROM profiles WHERE id = ANY(${idArr})`
     );
-    for (const p of profiles as ProfileLite[]) profileMap.set(p.id, p);
+    for (const p of profiles as unknown as ProfileLite[]) profileMap.set(p.id, p);
   }
 
   const entityTypes = typeRows.map((r: any) => r.entity_type as string).sort();

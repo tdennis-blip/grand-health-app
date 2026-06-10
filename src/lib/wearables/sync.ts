@@ -181,7 +181,7 @@ export async function upsertDailyMetrics(
   }));
 
   await serviceRoleSql`
-    INSERT INTO wearable_daily_metrics ${serviceRoleSql(rows)}
+    INSERT INTO wearable_daily_metrics ${serviceRoleSql(rows as any)}
     ON CONFLICT (patient_id, provider, metric_date) DO UPDATE SET
       sleep_total_minutes  = EXCLUDED.sleep_total_minutes,
       sleep_efficiency_pct = EXCLUDED.sleep_efficiency_pct,

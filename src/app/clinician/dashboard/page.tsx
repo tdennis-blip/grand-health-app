@@ -32,7 +32,7 @@ export default async function ClinicianDashboard() {
     last_name: r.last_name ?? null,
     member_since: r.member_since,
   }));
-  const error = null;
+  const error = null as { message: string } | null;
 
   return (
     <main className="max-w-6xl mx-auto px-6 py-6 space-y-5">

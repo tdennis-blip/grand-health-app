@@ -41,7 +41,7 @@ export async function createActivity(input: z.infer<typeof activitySchema>) {
   }
 
   const [inserted] = await withAuth(user, (sql) =>
-    sql`INSERT INTO grand100_activities (clinic_id, name, description, icon, accent, tier, required_vo2, required_strength_lb, required_strength_level, required_mobility_level, sort_order) VALUES (${user.clinicId}, ${parsed.name}, ${parsed.description ?? null}, ${parsed.icon ?? null}, ${parsed.accent ?? null}, ${parsed.tier}, ${parsed.requiredVo2}, ${parsed.requiredStrengthLb ?? null}, ${parsed.requiredStrengthLevel}, ${parsed.requiredMobilityLevel}, ${nextSort}) RETURNING id`
+    sql`INSERT INTO grand100_activities (clinic_id, name, description, icon, accent, tier, required_vo2, required_strength_lb, required_strength_level, required_mobility_level, sort_order) VALUES (${user.clinicId}, ${parsed.name}, ${parsed.description ?? null}, ${parsed.icon ?? null}, ${parsed.accent ?? null}, ${parsed.tier}, ${parsed.requiredVo2}, ${parsed.requiredStrengthLb ?? null}, ${parsed.requiredStrengthLevel}, ${parsed.requiredMobilityLevel}, ${nextSort ?? 0}) RETURNING id`
   );
   if (!inserted) throw new Error("Insert failed");
 

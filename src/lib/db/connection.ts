@@ -34,7 +34,7 @@ export const sql = postgres(connectionString ?? "", {
  */
 export async function withAuth<T>(
   user: AuthUser,
-  fn: (sql: postgres.Sql) => Promise<T>
+  fn: (sql: postgres.TransactionSql<{}>) => Promise<T>
 ): Promise<T> {
   return sql.begin(async (tx) => {
     await tx`
@@ -44,7 +44,7 @@ export async function withAuth<T>(
         set_config('app.current_clinic_id',  ${user.clinicId}, true)
     `;
     return fn(tx);
-  });
+  }) as Promise<T>;
 }
 
 /**

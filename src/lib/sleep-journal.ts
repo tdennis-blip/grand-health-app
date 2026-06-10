@@ -38,7 +38,7 @@ export async function getRecentJournal(
   const rows = await withAuth(resolvedUser, (sql) =>
     sql`SELECT id, entry_date, bed_time, wake_time, time_in_bed_minutes, awake_minutes, interruption_count, rested_rating, notes, updated_at FROM sleep_journal_entries WHERE patient_id = ${patientId} AND entry_date >= ${sinceIso} ORDER BY entry_date DESC`
   );
-  return rows as SleepJournalEntry[];
+  return rows as unknown as SleepJournalEntry[];
 }
 
 function isoDate(d: Date): string {
