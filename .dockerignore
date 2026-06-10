@@ -13,3 +13,5 @@ npm-debug.log*
 *.tsbuildinfo
 grand-health-app
 tsconfig.check.json
+
+infra
