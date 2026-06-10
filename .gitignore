@@ -43,3 +43,6 @@ android/
 
 # scratch typecheck config (sandbox-generated, do not commit)
 tsconfig.check.json
+
+# stale nested clone — never track
+/grand-health-app/
