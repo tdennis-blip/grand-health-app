@@ -1,0 +1,2 @@
+# Keeps the public/ directory present so the Docker build's `COPY public` step
+# succeeds. Put static assets (favicon, images, etc.) here.

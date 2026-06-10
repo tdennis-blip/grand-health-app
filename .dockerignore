@@ -1,0 +1,15 @@
+node_modules
+.next
+.git
+.env
+.env*.local
+ios
+android
+infra/node_modules
+infra/cdk.out
+npm-debug.log*
+.DS_Store
+**/.DS_Store
+*.tsbuildinfo
+grand-health-app
+tsconfig.check.json

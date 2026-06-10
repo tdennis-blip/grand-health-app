@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Harmless with `next start` (our App Runner run command); also lets the
+  // optional Dockerfile build a slim container if we ever switch to image-based.
+  output: "standalone",
   experimental: {
     // Server Components by default; we use them for any PHI-reading view.
   },

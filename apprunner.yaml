@@ -1,0 +1,48 @@
+# AWS App Runner source-based build config.
+# App Runner connects to this GitHub repo and runs these steps on every push.
+#
+# NEXT_PUBLIC_* values are inlined into the browser bundle at build time, so
+# they must be present during `npm run build`. They are NOT secrets (they end
+# up in client JS regardless), so they live here. Real secrets (DATABASE_URL,
+# SERVICE_ROLE_DATABASE_URL, API keys) are injected as App Runner *secrets*
+# from Secrets Manager at runtime — never commit those.
+version: 1.0
+runtime: nodejs22
+build:
+  commands:
+    build:
+      - npm ci --legacy-peer-deps
+      - npm run build
+  env:
+    - name: NEXT_TELEMETRY_DISABLED
+      value: "1"
+    - name: NEXT_PUBLIC_AWS_REGION
+      value: "us-east-1"
+    - name: NEXT_PUBLIC_COGNITO_USER_POOL_ID
+      value: "us-east-1_Yk5gVyw4D"
+    - name: NEXT_PUBLIC_COGNITO_CLIENT_ID
+      value: "n9pkk4kb0doa5hhspsv510ecq"
+    # Set this to the App Runner service URL after the first deploy, then push
+    # again so auth callbacks/redirects point at the right host.
+    - name: NEXT_PUBLIC_SITE_URL
+      value: "https://PLACEHOLDER.us-east-1.awsapprunner.com"
+run:
+  runtime-version: 22
+  command: npm run start
+  network:
+    port: 3000
+  env:
+    - name: NODE_ENV
+      value: "production"
+    - name: PORT
+      value: "3000"
+    # NEXT_PUBLIC_SITE_URL is also needed at runtime (server-side reads of it).
+    - name: NEXT_PUBLIC_SITE_URL
+      value: "https://PLACEHOLDER.us-east-1.awsapprunner.com"
+  # Runtime secrets are wired here once the service + Secrets Manager entries
+  # exist. value-from is the secret ARN. We'll fill these in step 3 (CDK):
+  # secrets:
+  #   - name: DATABASE_URL
+  #     value-from: "arn:aws:secretsmanager:us-east-1:<acct>:secret:grand-health-staging-app-env:DATABASE_URL::"
+  #   - name: SERVICE_ROLE_DATABASE_URL
+  #     value-from: "arn:aws:secretsmanager:us-east-1:<acct>:secret:grand-health-staging-app-env:SERVICE_ROLE_DATABASE_URL::"
