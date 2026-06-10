@@ -16,8 +16,12 @@ import postgres from "postgres";
 import type { AuthUser } from "@/lib/auth/server";
 
 const connectionString = process.env.DATABASE_URL;
-if (!connectionString && process.env.NODE_ENV !== "test") {
-  throw new Error("DATABASE_URL is not set.");
+// Don't throw at import time: Next.js imports every route module during the
+// production build ("Collecting page data"), before runtime env (Secrets
+// Manager) is injected. postgres() is lazy and won't connect until a query
+// runs, so a missing var here only matters at runtime.
+if (!connectionString && process.env.NODE_ENV === "production") {
+  console.warn("DATABASE_URL is not set; DB queries will fail until it is provided.");
 }
 
 // Shared pool — postgres-js handles connection pooling internally.
