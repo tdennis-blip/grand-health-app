@@ -1,0 +1,8 @@
+node_modules
+dist
+cdk.out
+*.d.ts
+# compiled JS from tsc (source of truth is the .ts files)
+bin/*.js
+lib/*.js
+*.js.map

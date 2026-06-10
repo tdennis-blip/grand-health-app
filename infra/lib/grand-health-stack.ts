@@ -6,6 +6,7 @@ import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import * as iam from "aws-cdk-lib/aws-iam";
 import { Construct } from "constructs";
+import { AppRuntime } from "./app-runtime";
 
 interface GrandHealthStackProps extends cdk.StackProps {
   stage: string;
@@ -216,6 +217,17 @@ export class GrandHealthStack extends cdk.Stack {
     new cdk.CfnOutput(this, "VpcId", {
       value: vpc.vpcId,
       exportName: `GrandHealth-${stage}-VpcId`,
+    });
+
+    // ── App hosting: ECS Fargate + ALB (in this VPC, reaches private RDS) ─────
+    // Phase 1 (default): creates ECR repo + GitHub deploy role + app-env secret.
+    // Phase 2 (`-c withService=true`, after an image is pushed): adds the
+    // Fargate service + load balancer.
+    new AppRuntime(this, "AppRuntime", {
+      vpc,
+      stage,
+      githubRepo: "tdennis-blip/grand-health-app",
+      deployService: this.node.tryGetContext("withService") === "true",
     });
 
     // ── Tags (HIPAA requires resource tagging for auditing) ───────────────────

@@ -4,6 +4,39 @@ Living orientation doc for the production app. **Read this first** when picking 
 
 ---
 
+## 🚧 ACTIVE: Staging deploy migration (handoff — updated 2026-06-10)
+
+**Goal:** get the app live on a shared URL for internal testing, HIPAA-compliant, AWS + GitHub.
+
+**Why not Amplify (the original plan):** AWS Amplify Hosting (a) can't run inside a VPC so it can't reach our private RDS, and (b) is **not HIPAA-eligible** (can't serve PHI even with a BAA). App Runner was the next pick but it's **closed to new customers as of 2026-04-30**. **Decision: host on AWS ECS Fargate** (HIPAA-eligible, runs in our VPC, reaches private RDS), image built/pushed by **GitHub Actions**.
+
+**Done & pushed to `main`:**
+- Production build fixes — 17 TS errors resolved (incl. two real `row is not defined` bugs in diet/grand100 save actions); `eslint.ignoreDuringBuilds` set (no eslint config exists). Build/typecheck is clean.
+- Removed the stray nested `grand-health-app/` embedded git repo; it's now gitignored.
+- `Dockerfile` + `.dockerignore` + `output: "standalone"` in next.config (container build; runs `next start`).
+- `apprunner.yaml` — vestigial (App Runner abandoned); harmless, can delete later.
+- `infra/lib/app-runtime.ts` — **ECS Fargate CDK**: ECR repo, GitHub OIDC deploy role, app-env Secrets Manager secret, and (phase 2) ECS cluster + Fargate service + ALB. Wired into `grand-health-stack.ts` behind `-c withService=true`. Both phases `cdk synth` clean.
+
+**NEXT STEPS (resume here):**
+1. **Phase-1 deploy** (adds ECR + deploy role + secret only; doesn't touch RDS/Cognito/VPC):
+   ```bash
+   cd infra && npx cdk deploy -c stage=staging
+   ```
+   Record the Outputs: `AppRuntimeEcrRepositoryUri`, `AppRuntimeGithubDeployRoleArn`, `AppRuntimeAppEnvSecretArn`.
+   - If it errors "OIDC provider already exists" → account already has a GitHub OIDC provider; switch CDK to `OpenIdConnectProvider.fromOpenIdConnectProviderArn(...)`.
+   - If it complains about `ts-node` → `npm i -D ts-node` in `infra/`.
+2. **GitHub Actions workflow** (not yet written) — build Docker image → push to ECR → register task def → update ECS service. Uses OIDC (the deploy role ARN from step 1 as a GitHub secret/variable). Trigger on push to `main`.
+3. **Push** → workflow builds first image into ECR.
+4. **Phase-2 deploy:** `cd infra && npx cdk deploy -c stage=staging -c withService=true` → creates the Fargate service + ALB. Note the `AlbUrl` output.
+5. **Fill the app-env secret** (`grand-health/staging/app-env` in Secrets Manager) with real values from `.env.local`: `DATABASE_URL`, `SERVICE_ROLE_DATABASE_URL`, `USDA_API_KEY`, `ANTHROPIC_API_KEY`, `CLOUDINARY_*` (currently `REPLACE_ME`).
+6. **Wire URLs:** set `NEXT_PUBLIC_SITE_URL` to the ALB URL (CDK `-c siteUrl=...` rebuild + GitHub build arg so it inlines into the client bundle), and add `<albUrl>/auth/callback` + `<albUrl>/login` to the Cognito app client callback/logout URLs.
+7. **Create test users** with `scripts/create-test-user.sh`, run `docs/staging-smoke-test.md`.
+8. **TLS:** staging comes up on HTTP first. Add ACM cert + HTTPS listener (custom domain like `staging.mygrandhealth.com`, or CloudFront) before any real use.
+
+**Key facts:** account `669960694177`, region `us-east-1`, Cognito pool `us-east-1_Yk5gVyw4D`, client `n9pkk4kb0doa5hhspsv510ecq`, seed clinic `00000000-0000-0000-0000-000000000001`. RDS `dbSg` already admits the whole VPC CIDR on 5432, so Fargate tasks reach it with no extra SG rule. **Caution:** repo lives in an iCloud-synced folder — causes git `index.lock` / sync-conflict issues; consider moving to `~/dev/`.
+
+---
+
 ## Stack
 
 | Layer | Choice |
