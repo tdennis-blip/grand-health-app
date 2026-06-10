@@ -46,3 +46,6 @@ tsconfig.check.json
 
 # stale nested clone — never track
 /grand-health-app/
+
+# stale nested clone — never track
+/grand-health-app/
