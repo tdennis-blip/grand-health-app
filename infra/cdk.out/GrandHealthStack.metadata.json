@@ -34,7 +34,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new Instance2 in aws-cdk-lib...",
-        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:100:21)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:101:21)",
         "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
         "...node internals..."
       ]
@@ -48,7 +48,7 @@
     {
       "type": "aws:cdk:creationStack",
       "data": [
-        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:117:5)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:118:5)",
         "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
         "...node internals, ts-node, ts-node..."
       ]
@@ -62,7 +62,7 @@
     {
       "type": "aws:cdk:creationStack",
       "data": [
-        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:201:5)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:202:5)",
         "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
         "...node internals, ts-node, ts-node..."
       ]
@@ -76,7 +76,7 @@
     {
       "type": "aws:cdk:creationStack",
       "data": [
-        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:206:5)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:207:5)",
         "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
         "...node internals, ts-node, ts-node..."
       ]
@@ -90,7 +90,7 @@
     {
       "type": "aws:cdk:creationStack",
       "data": [
-        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:211:5)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:212:5)",
         "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
         "...node internals, ts-node, ts-node..."
       ]
@@ -104,10 +104,16 @@
     {
       "type": "aws:cdk:creationStack",
       "data": [
-        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:216:5)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:217:5)",
         "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
         "...node internals, ts-node, ts-node..."
       ]
+    }
+  ],
+  "/GrandHealthStack/Custom::AWSCDKOpenIdConnectProviderCustomResourceProvider": [
+    {
+      "type": "aws:cdk:is-custom-resource-handler-customResourceProvider",
+      "data": true
     }
   ],
   "/GrandHealthStack/BootstrapVersion": [
@@ -145,7 +151,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new Vpc2 in aws-cdk-lib...",
-        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:23:17)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:24:17)",
         "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
         "...node internals, ts-node, ts-node..."
       ]
@@ -160,7 +166,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new Vpc2 in aws-cdk-lib...",
-        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:23:17)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:24:17)",
         "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
         "...node internals, ts-node, ts-node..."
       ]
@@ -175,7 +181,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new Vpc2 in aws-cdk-lib...",
-        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:23:17)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:24:17)",
         "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
         "...node internals, ts-node, ts-node..."
       ]
@@ -190,7 +196,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new Secret2 in aws-cdk-lib...",
-        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:36:22)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:37:22)",
         "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
         "...node internals, ts-node, ts-node..."
       ]
@@ -205,7 +211,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new SecurityGroup2 in aws-cdk-lib...",
-        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:46:18)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:47:18)",
         "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
         "...node internals, ts-node, ts-node..."
       ]
@@ -220,7 +226,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...WrappedClass.<anonymous> in aws-cdk-lib...",
-        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:111:10)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:112:10)",
         "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
         "...node internals, ts-node, ts-node..."
       ]
@@ -235,7 +241,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new DatabaseInstance2 in aws-cdk-lib...",
-        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:59:16)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:60:16)",
         "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
         "...node internals, ts-node, ts-node..."
       ]
@@ -250,7 +256,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new Role2 in aws-cdk-lib...",
-        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:87:25)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:88:25)",
         "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
         "...node internals, ts-node, ts-node..."
       ]
@@ -265,7 +271,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new SecurityGroup2 in aws-cdk-lib...",
-        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:94:23)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:95:23)",
         "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
         "...node internals, ts-node, ts-node..."
       ]
@@ -280,7 +286,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new Instance2 in aws-cdk-lib...",
-        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:100:21)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:101:21)",
         "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
         "...node internals, ts-node, ts-node..."
       ]
@@ -295,7 +301,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new Instance2 in aws-cdk-lib...",
-        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:100:21)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:101:21)",
         "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
         "...node internals, ts-node, ts-node..."
       ]
@@ -310,7 +316,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new StringParameter2 in aws-cdk-lib...",
-        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:124:5)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:125:5)",
         "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
         "...node internals, ts-node, ts-node..."
       ]
@@ -325,7 +331,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new StringParameter2 in aws-cdk-lib...",
-        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:129:5)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:130:5)",
         "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
         "...node internals, ts-node, ts-node..."
       ]
@@ -340,9 +346,86 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new UserPool2 in aws-cdk-lib...",
-        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:138:22)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:139:22)",
         "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
         "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/GrandHealthStack/AppRuntime/EcrRepositoryUri": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppRuntimeEcrRepositoryUriBF065902"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new AppRuntime (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/app-runtime.ts:132:5)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:226:5)",
+        "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/GrandHealthStack/AppRuntime/GithubDeployRoleArn": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppRuntimeGithubDeployRoleArnDF99348B"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new AppRuntime (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/app-runtime.ts:133:5)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:226:5)",
+        "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/GrandHealthStack/AppRuntime/AppEnvSecretArn": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppRuntimeAppEnvSecretArnFE331FE9"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new AppRuntime (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/app-runtime.ts:134:5)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:226:5)",
+        "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/GrandHealthStack/Custom::AWSCDKOpenIdConnectProviderCustomResourceProvider/Role": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CustomAWSCDKOpenIdConnectProviderCustomResourceProviderRole517FED65"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new OpenIdConnectProvider2 in aws-cdk-lib...",
+        "new AppRuntime (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/app-runtime.ts:85:24)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:226:5)",
+        "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
+        "...node internals..."
+      ]
+    }
+  ],
+  "/GrandHealthStack/Custom::AWSCDKOpenIdConnectProviderCustomResourceProvider/Handler": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CustomAWSCDKOpenIdConnectProviderCustomResourceProviderHandlerF2C543E0"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new OpenIdConnectProvider2 in aws-cdk-lib...",
+        "new AppRuntime (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/app-runtime.ts:85:24)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:226:5)",
+        "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
+        "...node internals..."
       ]
     }
   ],
@@ -412,7 +495,7 @@
         ".../Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/node_modules/aws-cdk-lib/aws-ec2/lib/vpc.js:1:197 in aws-cdk-lib...",
         "Array.forEach (:)",
         "...new Vpc2 in aws-cdk-lib...",
-        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:23:17)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:24:17)",
         "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
         "...node internals, ts-node..."
       ]
@@ -427,7 +510,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new Vpc2 in aws-cdk-lib...",
-        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:23:17)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:24:17)",
         "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
         "...node internals, ts-node..."
       ]
@@ -442,7 +525,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new Vpc2 in aws-cdk-lib...",
-        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:23:17)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:24:17)",
         "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
         "...node internals, ts-node..."
       ]
@@ -501,7 +584,7 @@
         ".../Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/node_modules/aws-cdk-lib/aws-ec2/lib/vpc.js:1:197 in aws-cdk-lib...",
         "Array.forEach (:)",
         "...new Vpc2 in aws-cdk-lib...",
-        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:23:17)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:24:17)",
         "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
         "...node internals, ts-node..."
       ]
@@ -558,7 +641,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new Vpc2 in aws-cdk-lib...",
-        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:23:17)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:24:17)",
         "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
         "...node internals..."
       ]
@@ -615,7 +698,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new Vpc2 in aws-cdk-lib...",
-        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:23:17)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:24:17)",
         "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
         "...node internals..."
       ]
@@ -714,7 +797,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new DatabaseInstance2 in aws-cdk-lib...",
-        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:59:16)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:60:16)",
         "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
         "...node internals, ts-node..."
       ]
@@ -729,7 +812,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new DatabaseInstance2 in aws-cdk-lib...",
-        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:59:16)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:60:16)",
         "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
         "...node internals, ts-node..."
       ]
@@ -744,7 +827,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new DatabaseInstance2 in aws-cdk-lib...",
-        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:59:16)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:60:16)",
         "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
         "...node internals, ts-node..."
       ]
@@ -759,7 +842,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...WrappedClass.addClient in aws-cdk-lib...",
-        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:168:37)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:169:37)",
         "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
         "...node internals, ts-node, ts-node..."
       ]
@@ -774,9 +857,86 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...WrappedClass.addDomain in aws-cdk-lib...",
-        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:196:14)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:197:14)",
         "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
         "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/GrandHealthStack/AppRuntime/Repo/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppRuntimeRepoE01ACDF4"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new Repository2 in aws-cdk-lib...",
+        "new AppRuntime (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/app-runtime.ts:56:23)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:226:5)",
+        "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/GrandHealthStack/AppRuntime/AppEnv/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppRuntimeAppEnv759C410D"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new Secret2 in aws-cdk-lib...",
+        "new AppRuntime (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/app-runtime.ts:68:25)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:226:5)",
+        "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/GrandHealthStack/AppRuntime/GithubDeployRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppRuntimeGithubDeployRoleEDBDE3AC"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new Role2 in aws-cdk-lib...",
+        "new AppRuntime (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/app-runtime.ts:90:24)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:226:5)",
+        "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/GrandHealthStack/AppRuntime/GithubOidc/Resource/Default": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppRuntimeGithubOidcAE92EF61"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new OpenIdConnectProvider2 in aws-cdk-lib...",
+        "new AppRuntime (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/app-runtime.ts:85:24)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:226:5)",
+        "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
+        "...node internals, ts-node..."
+      ]
+    }
+  ],
+  "/GrandHealthStack/AppRuntime/GithubDeployRole/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppRuntimeGithubDeployRoleDefaultPolicyE11F85E1"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...WrappedClass.grantPullPush in aws-cdk-lib...",
+        "new AppRuntime (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/app-runtime.ts:102:21)"
       ]
     }
   ]

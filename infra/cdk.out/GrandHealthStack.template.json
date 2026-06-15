@@ -1256,7 +1256,7 @@
     ],
     "CallbackURLs": [
      "http://localhost:3000/auth/callback",
-     "https://YOUR_STAGING_DOMAIN/auth/callback"
+     "https://staging.mygrandhealth.com/auth/callback"
     ],
     "ClientName": "grand-health-staging-nextjs",
     "ExplicitAuthFlows": [
@@ -1268,7 +1268,7 @@
     "IdTokenValidity": 60,
     "LogoutURLs": [
      "http://localhost:3000/login",
-     "https://YOUR_STAGING_DOMAIN/login"
+     "https://staging.mygrandhealth.com/login"
     ],
     "PreventUserExistenceErrors": "ENABLED",
     "RefreshTokenValidity": 43200,
@@ -1300,10 +1300,272 @@
     "aws:cdk:path": "GrandHealthStack/UserPool/Domain/Resource"
    }
   },
+  "AppRuntimeRepoE01ACDF4": {
+   "Type": "AWS::ECR::Repository",
+   "Properties": {
+    "EmptyOnDelete": true,
+    "ImageScanningConfiguration": {
+     "ScanOnPush": true
+    },
+    "LifecyclePolicy": {
+     "LifecyclePolicyText": "{\"rules\":[{\"rulePriority\":1,\"selection\":{\"tagStatus\":\"any\",\"countType\":\"imageCountMoreThan\",\"countNumber\":15},\"action\":{\"type\":\"expire\"}}]}"
+    },
+    "RepositoryName": "grand-health-staging",
+    "Tags": [
+     {
+      "Key": "PHI",
+      "Value": "true"
+     },
+     {
+      "Key": "Project",
+      "Value": "GrandHealth"
+     },
+     {
+      "Key": "Stage",
+      "Value": "staging"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "GrandHealthStack/AppRuntime/Repo/Resource"
+   }
+  },
+  "AppRuntimeAppEnv759C410D": {
+   "Type": "AWS::SecretsManager::Secret",
+   "Properties": {
+    "Name": "grand-health/staging/app-env",
+    "SecretString": "{\"DATABASE_URL\":\"REPLACE_ME\",\"SERVICE_ROLE_DATABASE_URL\":\"REPLACE_ME\",\"USDA_API_KEY\":\"REPLACE_ME\",\"ANTHROPIC_API_KEY\":\"REPLACE_ME\",\"CLOUDINARY_CLOUD_NAME\":\"REPLACE_ME\",\"CLOUDINARY_API_KEY\":\"REPLACE_ME\",\"CLOUDINARY_API_SECRET\":\"REPLACE_ME\"}",
+    "Tags": [
+     {
+      "Key": "PHI",
+      "Value": "true"
+     },
+     {
+      "Key": "Project",
+      "Value": "GrandHealth"
+     },
+     {
+      "Key": "Stage",
+      "Value": "staging"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "GrandHealthStack/AppRuntime/AppEnv/Resource"
+   }
+  },
+  "AppRuntimeGithubOidcAE92EF61": {
+   "Type": "Custom::AWSCDKOpenIdConnectProvider",
+   "Properties": {
+    "ServiceToken": {
+     "Fn::GetAtt": [
+      "CustomAWSCDKOpenIdConnectProviderCustomResourceProviderHandlerF2C543E0",
+      "Arn"
+     ]
+    },
+    "ClientIDList": [
+     "sts.amazonaws.com"
+    ],
+    "Url": "https://token.actions.githubusercontent.com",
+    "RejectUnauthorized": false,
+    "CodeHash": "d75c48c9f82cde63e9bf414df335e84e8ac24f11eb34889be255b702aec71e50"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "GrandHealthStack/AppRuntime/GithubOidc/Resource/Default"
+   }
+  },
+  "AppRuntimeGithubDeployRoleEDBDE3AC": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRoleWithWebIdentity",
+       "Condition": {
+        "StringEquals": {
+         "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+        },
+        "StringLike": {
+         "token.actions.githubusercontent.com:sub": "repo:tdennis-blip/grand-health-app:*"
+        }
+       },
+       "Effect": "Allow",
+       "Principal": {
+        "Federated": {
+         "Ref": "AppRuntimeGithubOidcAE92EF61"
+        }
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "Description": "Assumed by GitHub Actions to build/push images and deploy ECS",
+    "RoleName": "grand-health-staging-gh-deploy",
+    "Tags": [
+     {
+      "Key": "PHI",
+      "Value": "true"
+     },
+     {
+      "Key": "Project",
+      "Value": "GrandHealth"
+     },
+     {
+      "Key": "Stage",
+      "Value": "staging"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "GrandHealthStack/AppRuntime/GithubDeployRole/Resource"
+   }
+  },
+  "AppRuntimeGithubDeployRoleDefaultPolicyE11F85E1": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:BatchGetImage",
+        "ecr:CompleteLayerUpload",
+        "ecr:UploadLayerPart",
+        "ecr:InitiateLayerUpload",
+        "ecr:PutImage"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "AppRuntimeRepoE01ACDF4",
+         "Arn"
+        ]
+       }
+      },
+      {
+       "Action": "ecr:GetAuthorizationToken",
+       "Effect": "Allow",
+       "Resource": "*"
+      },
+      {
+       "Action": [
+        "ecs:DescribeServices",
+        "ecs:DescribeTaskDefinition",
+        "ecs:RegisterTaskDefinition",
+        "ecs:UpdateService",
+        "ecs:DescribeClusters"
+       ],
+       "Effect": "Allow",
+       "Resource": "*"
+      },
+      {
+       "Action": "iam:PassRole",
+       "Condition": {
+        "StringEquals": {
+         "iam:PassedToService": "ecs-tasks.amazonaws.com"
+        }
+       },
+       "Effect": "Allow",
+       "Resource": "*"
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "AppRuntimeGithubDeployRoleDefaultPolicyE11F85E1",
+    "Roles": [
+     {
+      "Ref": "AppRuntimeGithubDeployRoleEDBDE3AC"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "GrandHealthStack/AppRuntime/GithubDeployRole/DefaultPolicy/Resource"
+   }
+  },
+  "CustomAWSCDKOpenIdConnectProviderCustomResourceProviderRole517FED65": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Version": "2012-10-17",
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ]
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+     }
+    ],
+    "Policies": [
+     {
+      "PolicyName": "Inline",
+      "PolicyDocument": {
+       "Version": "2012-10-17",
+       "Statement": [
+        {
+         "Effect": "Allow",
+         "Resource": "*",
+         "Action": [
+          "iam:CreateOpenIDConnectProvider",
+          "iam:DeleteOpenIDConnectProvider",
+          "iam:UpdateOpenIDConnectProviderThumbprint",
+          "iam:AddClientIDToOpenIDConnectProvider",
+          "iam:RemoveClientIDFromOpenIDConnectProvider"
+         ]
+        }
+       ]
+      }
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "GrandHealthStack/Custom::AWSCDKOpenIdConnectProviderCustomResourceProvider/Role"
+   }
+  },
+  "CustomAWSCDKOpenIdConnectProviderCustomResourceProviderHandlerF2C543E0": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-669960694177-us-east-1",
+     "S3Key": "d75c48c9f82cde63e9bf414df335e84e8ac24f11eb34889be255b702aec71e50.zip"
+    },
+    "Timeout": 900,
+    "MemorySize": 128,
+    "Handler": "__entrypoint__.handler",
+    "Role": {
+     "Fn::GetAtt": [
+      "CustomAWSCDKOpenIdConnectProviderCustomResourceProviderRole517FED65",
+      "Arn"
+     ]
+    },
+    "Runtime": "nodejs22.x"
+   },
+   "DependsOn": [
+    "CustomAWSCDKOpenIdConnectProviderCustomResourceProviderRole517FED65"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "GrandHealthStack/Custom::AWSCDKOpenIdConnectProviderCustomResourceProvider/Handler",
+    "aws:asset:path": "asset.d75c48c9f82cde63e9bf414df335e84e8ac24f11eb34889be255b702aec71e50",
+    "aws:asset:property": "Code"
+   }
+  },
   "CDKMetadata": {
    "Type": "AWS::CDK::Metadata",
    "Properties": {
-    "Analytics": "v2:deflate64:H4sIAAAAAAAA/31RwW7CMAz9lt1DxqqhnRlMqJetahnXyQ2mC7QJchwQqvrvUwi0jEk7+b3np/jZSWQyeZHjBzi6kVrvRrUuZVswqJ2Ao/tqUSWyXe2VmG3MKpuJzJe1VoUvDXLQBpRbz7iEssZBH7Spc1ZpYG1Nbw7gLc1CeQdeAOMRTiIjfQDG4eHUMJLB3hCTXNiUGdR3g4ZFgcqT5tOCrN+fM/wrpKYidE6kxjEYhXFUxJ1wqAjZNWCgQpJtceaXRwKKZQlUId+E6A33nU7Q2sl2DgwlOOynxj37iPPXP8IQSkMj29zGC1/rtZ2R3eg6RHdN+ELSpsqAoEFGCsaedELZymi2sv10SJm1dej3+Apmtb6sdKdc6dw2oM2tISpdJ3J01lO86q8UH573njth7Brl1j0ekmf5NJHjh63TekTesG5Q5rH+ADKXAxmeAgAA"
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/31RTW+cMBD9Lbl73XTVqOcNW0VcGgvSXKvBTKgTsNHMeFcR4r9X4AU2qdTTvC/Zz+O93t9917c3cOadrd92rav0UArYNwVn/j2g3evhubcqe/HPJlMmVq2zZaw8yqRtqAhR8AmqFjd90w7MwToQF/wansCP3EzjJ8gDCJ7hXRlyJxDcDs69IHlcA6nJhR1EwP7p0Isq0UZy8v5AIfZzh/8KuW8ImVXuWcBbTFclPCpGSyjcgYcGSQ/lzC+HTCiNJ6AG5arEGvjsjIpq1sMRBCpgXG9N71wrHu//EbZSDjo9FCFteJmLbSi8uBbVY48+r7PgPVoxFE6uRlImtM7Ou0toVMzd9NPkfGOAoENBmv2FjMqGxjsJevjFSCaEdvJXvICsdZeXf1IWegwdOH8dSMqo0JIeCuwDOwk019vYOKoCOURKf/Oh5GOUPorKIkvorlMb/mAte7gHRnVgRikFGuebUflQo37lL6f9N/31Tt/evLJzO4peXIe6SPMvxmO3qScDAAA="
    },
    "Metadata": {
     "aws:cdk:path": "GrandHealthStack/CDKMetadata/Default"
@@ -1361,6 +1623,69 @@
    },
    "Export": {
     "Name": "GrandHealth-staging-VpcId"
+   }
+  },
+  "AppRuntimeEcrRepositoryUriBF065902": {
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      {
+       "Fn::Select": [
+        4,
+        {
+         "Fn::Split": [
+          ":",
+          {
+           "Fn::GetAtt": [
+            "AppRuntimeRepoE01ACDF4",
+            "Arn"
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      ".dkr.ecr.",
+      {
+       "Fn::Select": [
+        3,
+        {
+         "Fn::Split": [
+          ":",
+          {
+           "Fn::GetAtt": [
+            "AppRuntimeRepoE01ACDF4",
+            "Arn"
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      ".",
+      {
+       "Ref": "AWS::URLSuffix"
+      },
+      "/",
+      {
+       "Ref": "AppRuntimeRepoE01ACDF4"
+      }
+     ]
+    ]
+   }
+  },
+  "AppRuntimeGithubDeployRoleArnDF99348B": {
+   "Value": {
+    "Fn::GetAtt": [
+     "AppRuntimeGithubDeployRoleEDBDE3AC",
+     "Arn"
+    ]
+   }
+  },
+  "AppRuntimeAppEnvSecretArnFE331FE9": {
+   "Value": {
+    "Ref": "AppRuntimeAppEnv759C410D"
    }
   }
  },

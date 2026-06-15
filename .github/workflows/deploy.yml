@@ -1,25 +1,50 @@
 name: Deploy to ECS (staging)
 
+# Builds the container, pushes it to ECR, and rolls the ECS Fargate service.
+# Auth is via GitHub OIDC -> the CDK-created deploy role (no long-lived keys).
+#
+# Required GitHub repo configuration (Settings -> Secrets and variables -> Actions):
+#   Secrets:
+#     AWS_DEPLOY_ROLE_ARN   = AppRuntimeGithubDeployRoleArn output from `cdk deploy`
+#   Variables (optional - defaults below match the CDK stack):
+#     AWS_REGION            = us-east-1
+#     ECR_REPOSITORY        = grand-health-staging
+#     ECS_CLUSTER           = grand-health-staging
+#     ECS_SERVICE           = grand-health-staging-web
+#     ECS_TASK_FAMILY       = grand-health-staging-web
+#     CONTAINER_NAME        = web
+#     NEXT_PUBLIC_SITE_URL  = https://staging.mygrandhealth.com
+#   The NEXT_PUBLIC_* Cognito values are baked into the image at build time and
+#   are not secret. They are set as variables with sensible defaults below.
+
 on:
   push:
     branches: [main]
-  workflow_dispatch:
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
 
 permissions:
-  id-token: write
+  id-token: write   # required for OIDC
   contents: read
 
 env:
-  AWS_REGION: us-east-1
-  ECR_REPOSITORY: grand-health-staging
-  ECS_CLUSTER: grand-health-staging
-  ECS_SERVICE: grand-health-staging-web
-  ECS_TASK_FAMILY: grand-health-staging-web
-  CONTAINER_NAME: web
-  DEPLOY_ROLE_ARN: arn:aws:iam::669960694177:role/grand-health-staging-gh-deploy
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY || 'grand-health-staging' }}
+  ECS_CLUSTER: ${{ vars.ECS_CLUSTER || 'grand-health-staging' }}
+  ECS_SERVICE: ${{ vars.ECS_SERVICE || 'grand-health-staging-web' }}
+  ECS_TASK_FAMILY: ${{ vars.ECS_TASK_FAMILY || 'grand-health-staging-web' }}
+  CONTAINER_NAME: ${{ vars.CONTAINER_NAME || 'web' }}
+  # NEXT_PUBLIC_* are inlined into the client bundle at build time.
+  NEXT_PUBLIC_AWS_REGION: ${{ vars.NEXT_PUBLIC_AWS_REGION || 'us-east-1' }}
+  NEXT_PUBLIC_COGNITO_USER_POOL_ID: ${{ vars.NEXT_PUBLIC_COGNITO_USER_POOL_ID || 'us-east-1_Yk5gVyw4D' }}
+  NEXT_PUBLIC_COGNITO_CLIENT_ID: ${{ vars.NEXT_PUBLIC_COGNITO_CLIENT_ID || 'n9pkk4kb0doa5hhspsv510ecq' }}
+  NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL || 'http://PLACEHOLDER' }}
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -28,10 +53,10 @@ jobs:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ env.DEPLOY_ROLE_ARN }}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to Amazon ECR
+      - name: Log in to Amazon ECR
         id: ecr
         uses: aws-actions/amazon-ecr-login@v2
 
@@ -40,48 +65,53 @@ jobs:
         env:
           REGISTRY: ${{ steps.ecr.outputs.registry }}
         run: |
-          IMAGE_URI="$REGISTRY/$ECR_REPOSITORY"
+          IMAGE_TAG="${GITHUB_SHA::12}"
+          IMAGE_URI="${REGISTRY}/${ECR_REPOSITORY}"
           docker build \
-            --build-arg NEXT_PUBLIC_AWS_REGION=us-east-1 \
-            --build-arg NEXT_PUBLIC_COGNITO_USER_POOL_ID=us-east-1_Yk5gVyw4D \
-            --build-arg NEXT_PUBLIC_COGNITO_CLIENT_ID=n9pkk4kb0doa5hhspsv510ecq \
-            --build-arg NEXT_PUBLIC_SITE_URL=http://GrandH-AppRu-fGEmWB5254DN-1041571929.us-east-1.elb.amazonaws.com \
-            -t "$IMAGE_URI:${{ github.sha }}" -t "$IMAGE_URI:latest" .
-          docker push "$IMAGE_URI:${{ github.sha }}"
-          docker push "$IMAGE_URI:latest"
-          echo "image=$IMAGE_URI:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+            --build-arg NEXT_PUBLIC_AWS_REGION="${NEXT_PUBLIC_AWS_REGION}" \
+            --build-arg NEXT_PUBLIC_COGNITO_USER_POOL_ID="${NEXT_PUBLIC_COGNITO_USER_POOL_ID}" \
+            --build-arg NEXT_PUBLIC_COGNITO_CLIENT_ID="${NEXT_PUBLIC_COGNITO_CLIENT_ID}" \
+            --build-arg NEXT_PUBLIC_SITE_URL="${NEXT_PUBLIC_SITE_URL}" \
+            -t "${IMAGE_URI}:${IMAGE_TAG}" \
+            -t "${IMAGE_URI}:latest" \
+            .
+          docker push "${IMAGE_URI}:${IMAGE_TAG}"
+          docker push "${IMAGE_URI}:latest"
+          echo "image=${IMAGE_URI}:${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
 
-      - name: Check whether ECS service exists
+      # Phase 1 (ECR + role + secret only, no service yet): the service does not
+      # exist, so skip the deploy steps instead of failing the run.
+      - name: Check whether the ECS service exists
         id: svc
         run: |
           STATUS=$(aws ecs describe-services \
-            --cluster "$ECS_CLUSTER" \
-            --services "$ECS_SERVICE" \
-            --query 'services[0].status' --output text 2>/dev/null || echo "NONE")
-          if [ "$STATUS" = "ACTIVE" ]; then
+            --cluster "${ECS_CLUSTER}" \
+            --services "${ECS_SERVICE}" \
+            --query 'services[0].status' --output text 2>/dev/null || echo "MISSING")
+          if [ "${STATUS}" = "ACTIVE" ]; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
-            echo "ECS service not found yet (status=$STATUS). Image is pushed; run the Phase-2 CDK deploy to create the service, then re-run this workflow."
+            echo "::notice::ECS service ${ECS_SERVICE} not ACTIVE (status=${STATUS}). Image pushed; skipping service update. Run the Phase-2 CDK deploy (-c withService=true) to create it."
           fi
 
       - name: Download current task definition
         if: steps.svc.outputs.exists == 'true'
         run: |
           aws ecs describe-task-definition \
-            --task-definition "$ECS_TASK_FAMILY" \
-            --query 'taskDefinition' --output json > task-def.json
+            --task-definition "${ECS_TASK_FAMILY}" \
+            --query 'taskDefinition' --output json > task-definition.json
 
       - name: Render new image into task definition
         if: steps.svc.outputs.exists == 'true'
         id: render
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
-          task-definition: task-def.json
+          task-definition: task-definition.json
           container-name: ${{ env.CONTAINER_NAME }}
           image: ${{ steps.build.outputs.image }}
 
-      - name: Deploy to ECS
+      - name: Deploy updated task definition
         if: steps.svc.outputs.exists == 'true'
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         with:

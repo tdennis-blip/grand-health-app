@@ -6,6 +6,9 @@ import * as ecsp from "aws-cdk-lib/aws-ecs-patterns";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as logs from "aws-cdk-lib/aws-logs";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
+import * as acm from "aws-cdk-lib/aws-certificatemanager";
+import * as route53 from "aws-cdk-lib/aws-route53";
+import * as elbv2 from "aws-cdk-lib/aws-elasticloadbalancingv2";
 import { Construct } from "constructs";
 
 export interface AppRuntimeProps {
@@ -20,6 +23,15 @@ export interface AppRuntimeProps {
    * `-c withService=true`) once an image exists in ECR.
    */
   deployService: boolean;
+  /**
+   * Custom domain for the app, e.g. "staging.mygrandhealth.com". When set
+   * (together with `hostedZoneName` and `deployService`), the ALB serves HTTPS
+   * on this domain with an ACM cert, HTTP is redirected to HTTPS, and an alias
+   * record is created in the hosted zone.
+   */
+  domainName?: string;
+  /** Route 53 hosted zone the domain lives in, e.g. "mygrandhealth.com". */
+  hostedZoneName?: string;
 }
 
 /**
@@ -35,7 +47,7 @@ export class AppRuntime extends Construct {
 
   constructor(scope: Construct, id: string, props: AppRuntimeProps) {
     super(scope, id);
-    const { vpc, stage, githubRepo, deployService } = props;
+    const { vpc, stage, githubRepo, deployService, domainName, hostedZoneName } = props;
     const isProd = stage === "prod";
     this.clusterName = `grand-health-${stage}`;
     this.serviceName = `grand-health-${stage}-web`;
@@ -136,10 +148,26 @@ export class AppRuntime extends Construct {
       removalPolicy: isProd ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
     });
 
+    // ── Custom domain + TLS (optional) ────────────────────────────────────────
+    // When a domain + hosted zone are supplied, look up the zone and mint an
+    // ACM cert validated via DNS. The cert + zone are handed to the ALB service
+    // below so it terminates HTTPS and creates the alias record automatically.
+    let zone: route53.IHostedZone | undefined;
+    let certificate: acm.ICertificate | undefined;
+    if (domainName && hostedZoneName) {
+      zone = route53.HostedZone.fromLookup(this, "Zone", {
+        domainName: hostedZoneName,
+      });
+      certificate = new acm.Certificate(this, "Cert", {
+        domainName,
+        validation: acm.CertificateValidation.fromDns(zone),
+      });
+    }
+
     // Non-secret, build-time-inlined client config (also read server-side).
     const siteUrl =
       this.node.tryGetContext("siteUrl") ??
-      "http://PLACEHOLDER"; // updated after we know the ALB/domain
+      (domainName ? `https://${domainName}` : "http://PLACEHOLDER");
     const environment: Record<string, string> = {
       NODE_ENV: "production",
       PORT: "3000",
@@ -171,6 +199,18 @@ export class AppRuntime extends Construct {
       assignPublicIp: false,
       healthCheckGracePeriod: cdk.Duration.seconds(120),
       circuitBreaker: { rollback: true },
+      // HTTPS on the custom domain when a cert/zone were resolved above;
+      // otherwise the ALB stays on plain HTTP.
+      ...(certificate && zone
+        ? {
+            certificate,
+            domainName,
+            domainZone: zone,
+            protocol: elbv2.ApplicationProtocol.HTTPS,
+            redirectHTTP: true,
+            sslPolicy: elbv2.SslPolicy.RECOMMENDED,
+          }
+        : {}),
       taskImageOptions: {
         image: ecs.ContainerImage.fromEcrRepository(this.repository, "latest"),
         containerPort: 3000,
@@ -190,8 +230,16 @@ export class AppRuntime extends Construct {
     });
 
     new cdk.CfnOutput(this, "AlbUrl", {
-      value: `http://${service.loadBalancer.loadBalancerDnsName}`,
-      description: "Staging app URL (HTTP until TLS is added)",
+      value: domainName
+        ? `https://${domainName}`
+        : `http://${service.loadBalancer.loadBalancerDnsName}`,
+      description: domainName
+        ? "Staging app URL (HTTPS via custom domain)"
+        : "Staging app URL (HTTP until TLS is added)",
+    });
+    new cdk.CfnOutput(this, "AlbDnsName", {
+      value: service.loadBalancer.loadBalancerDnsName,
+      description: "Raw ALB DNS name (target of the Route 53 alias)",
     });
   }
 }

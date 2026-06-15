@@ -182,10 +182,10 @@ export class GrandHealthStack extends cdk.Stack {
         ],
         callbackUrls: isProd
           ? ["https://YOUR_PROD_DOMAIN/auth/callback"]
-          : ["http://localhost:3000/auth/callback", "https://YOUR_STAGING_DOMAIN/auth/callback"],
+          : ["http://localhost:3000/auth/callback", "https://staging.mygrandhealth.com/auth/callback"],
         logoutUrls: isProd
           ? ["https://YOUR_PROD_DOMAIN/login"]
-          : ["http://localhost:3000/login", "https://YOUR_STAGING_DOMAIN/login"],
+          : ["http://localhost:3000/login", "https://staging.mygrandhealth.com/login"],
       },
       accessTokenValidity: cdk.Duration.hours(1),
       idTokenValidity: cdk.Duration.hours(1),
@@ -228,6 +228,10 @@ export class GrandHealthStack extends cdk.Stack {
       stage,
       githubRepo: "tdennis-blip/grand-health-app",
       deployService: this.node.tryGetContext("withService") === "true",
+      // Pass `-c domain=staging.mygrandhealth.com -c hostedZone=mygrandhealth.com`
+      // to serve the app over HTTPS on the custom domain (Phase 2).
+      domainName: this.node.tryGetContext("domain") as string | undefined,
+      hostedZoneName: this.node.tryGetContext("hostedZone") as string | undefined,
     });
 
     // ── Tags (HIPAA requires resource tagging for auditing) ───────────────────
