@@ -92,11 +92,13 @@ export function SessionEditor({
   const computedEst = useMemo(() => {
     if (form.kind === "zone2") return Math.max(5, form.durationMin ?? 30);
     if (form.kind === "vo2max") {
-      const w = form.warmupMin ?? 0;
-      const r = form.rounds ?? 0;
-      const wm = form.workMin ?? 0;
-      const rm = form.recoverMin ?? 0;
-      const cd = form.cooldownMin ?? 0;
+      // Use the same fallback defaults the input fields display, so the auto
+      // total matches what the clinician sees before they edit each field.
+      const w = form.warmupMin ?? 10;
+      const r = form.rounds ?? 4;
+      const wm = form.workMin ?? 4;
+      const rm = form.recoverMin ?? 3;
+      const cd = form.cooldownMin ?? 5;
       // Total session time: warm-up + every round's work AND recovery + cool-down.
       return Math.max(5, w + r * wm + r * rm + cd);
     }
@@ -106,7 +108,7 @@ export function SessionEditor({
   // VO₂ max working minutes only (the high-intensity work intervals) — drives
   // the weekly VO₂ max minutes view, separate from total session time above.
   const vo2WorkMin = useMemo(
-    () => Math.max(0, (form.rounds ?? 0) * (form.workMin ?? 0)),
+    () => Math.max(0, (form.rounds ?? 4) * (form.workMin ?? 4)),
     [form.rounds, form.workMin]
   );
 
