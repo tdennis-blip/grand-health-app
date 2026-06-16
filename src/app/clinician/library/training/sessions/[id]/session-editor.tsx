@@ -97,10 +97,18 @@ export function SessionEditor({
       const wm = form.workMin ?? 0;
       const rm = form.recoverMin ?? 0;
       const cd = form.cooldownMin ?? 0;
-      return Math.max(5, w + r * wm + Math.max(0, r - 1) * rm + cd);
+      // Total session time: warm-up + every round's work AND recovery + cool-down.
+      return Math.max(5, w + r * wm + r * rm + cd);
     }
     return form.estMinutes;
   }, [form.kind, form.durationMin, form.warmupMin, form.rounds, form.workMin, form.recoverMin, form.cooldownMin, form.estMinutes]);
+
+  // VO₂ max working minutes only (the high-intensity work intervals) — drives
+  // the weekly VO₂ max minutes view, separate from total session time above.
+  const vo2WorkMin = useMemo(
+    () => Math.max(0, (form.rounds ?? 0) * (form.workMin ?? 0)),
+    [form.rounds, form.workMin]
+  );
 
   const dirty =
     form.name !== initial.name ||
@@ -242,6 +250,11 @@ export function SessionEditor({
               <div className="text-[11px] uppercase tracking-wide text-slate-500 font-semibold">Cool-down</div>
               <NumField label="Cool-down (min)" value={form.cooldownMin ?? 5}
                 onChange={(v) => { setForm((p) => ({ ...p, cooldownMin: v })); setSaved(false); }} />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <ReadOnly label="VO₂ max minutes (work only)" value={`${vo2WorkMin}m`} />
+              <ReadOnly label="Total session time (auto)" value={`${computedEst}m`} />
             </div>
 
             <FieldTextarea label="Coach note" value={form.coachNote ?? ""}
