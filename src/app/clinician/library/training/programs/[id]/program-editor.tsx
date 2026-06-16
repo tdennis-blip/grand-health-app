@@ -102,7 +102,7 @@ export function ProgramEditor({
     if (sess.kind === "strength") strength += 1;
     else if (sess.kind === "mobility") mobility += 1;
     else if (sess.kind === "zone2") zone2Min += sess.durationMin ?? sess.estMinutes;
-    else if (sess.kind === "vo2max") vo2Min += (sess.rounds ?? 0) * (sess.workMin ?? 0);
+    else if (sess.kind === "vo2max") vo2Min += (sess.rounds ?? 4) * (sess.workMin ?? 4);
   });
   const restDays = DAY_KEYS.filter((d) => initialDays[d].length === 0).length;
 

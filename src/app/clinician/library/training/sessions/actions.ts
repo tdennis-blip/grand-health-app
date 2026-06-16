@@ -74,15 +74,17 @@ export async function updateSessionHeader(input: z.infer<typeof headerSchema>) {
   const user = await requireClinician();
 
   const modality = parsed.kind === "zone2" || parsed.kind === "vo2max" ? (parsed.modality ?? null) : null;
-  const duration_min = parsed.kind === "zone2" ? (parsed.durationMin ?? null) : null;
+  // Persist the same fallback defaults the editor shows, so cardio fields are
+  // never saved as null (which would zero out the weekly summary / est minutes).
+  const duration_min = parsed.kind === "zone2" ? (parsed.durationMin ?? 30) : null;
   const target_zone_id = parsed.kind === "zone2" ? (parsed.targetZoneId ?? null) : null;
-  const warmup_min = parsed.kind === "vo2max" ? (parsed.warmupMin ?? null) : null;
-  const rounds = parsed.kind === "vo2max" ? (parsed.rounds ?? null) : null;
-  const work_min = parsed.kind === "vo2max" ? (parsed.workMin ?? null) : null;
+  const warmup_min = parsed.kind === "vo2max" ? (parsed.warmupMin ?? 10) : null;
+  const rounds = parsed.kind === "vo2max" ? (parsed.rounds ?? 4) : null;
+  const work_min = parsed.kind === "vo2max" ? (parsed.workMin ?? 4) : null;
   const work_zone_id = parsed.kind === "vo2max" ? (parsed.workZoneId ?? null) : null;
-  const recover_min = parsed.kind === "vo2max" ? (parsed.recoverMin ?? null) : null;
+  const recover_min = parsed.kind === "vo2max" ? (parsed.recoverMin ?? 3) : null;
   const recover_zone_id = parsed.kind === "vo2max" ? (parsed.recoverZoneId ?? null) : null;
-  const cooldown_min = parsed.kind === "vo2max" ? (parsed.cooldownMin ?? null) : null;
+  const cooldown_min = parsed.kind === "vo2max" ? (parsed.cooldownMin ?? 5) : null;
 
   await withAuth(user, (sql) =>
     sql`UPDATE session_library SET kind = ${parsed.kind}, name = ${parsed.name}, focus = ${parsed.focus ?? null}, est_minutes = ${parsed.estMinutes}, accent = ${parsed.accent ?? null}, coach_note = ${parsed.coachNote ?? null}, modality = ${modality}, duration_min = ${duration_min}, target_zone_id = ${target_zone_id}, warmup_min = ${warmup_min}, rounds = ${rounds}, work_min = ${work_min}, work_zone_id = ${work_zone_id}, recover_min = ${recover_min}, recover_zone_id = ${recover_zone_id}, cooldown_min = ${cooldown_min}, updated_at = ${new Date().toISOString()} WHERE id = ${parsed.id}`
