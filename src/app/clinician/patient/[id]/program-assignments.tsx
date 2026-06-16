@@ -36,6 +36,12 @@ export function ProgramAssignments({
         <div>
           <div className="text-sm font-semibold text-slate-900">Training programs</div>
           <div className="text-[11px] text-slate-500">Assign a program to give this patient a weekly schedule.</div>
+          <Link
+            href={`/clinician/patient/${patientId}/workouts`}
+            className="text-[11px] font-semibold text-teal-700 hover:text-teal-800 inline-block mt-1"
+          >
+            View logged workouts &rarr;
+          </Link>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <select

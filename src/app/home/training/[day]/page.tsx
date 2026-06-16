@@ -5,10 +5,12 @@ import {
   getActiveAssignment,
   getWeekSchedule,
   getSessionDetail,
+  getSetLogsForSession,
   DAY_KEYS,
   DAY_LABELS,
   type DayKey,
 } from "@/lib/training";
+import { SetLogger } from "./set-logger";
 
 const KIND_ICON = {
   strength: Dumbbell, zone2: Activity, vo2max: Flame, mobility: Sparkles,
@@ -118,6 +120,13 @@ export default async function PatientSessionDetail({
   const session = await getSessionDetail(picked.id);
   if (!session) notFound();
 
+  // Patient's logged actuals for today (strength/mobility only).
+  const logDate = new Date().toISOString().slice(0, 10);
+  const setLogs =
+    session.kind === "strength" || session.kind === "mobility"
+      ? await getSetLogsForSession(session.id, logDate)
+      : {};
+
   const Icon = KIND_ICON[session.kind];
   const gradient = session.accent || KIND_TILE[session.kind];
 
@@ -204,9 +213,6 @@ export default async function PatientSessionDetail({
             </div>
           )}
           {session.exercises.map((ex, idx) => {
-            const labels = session.kind === "mobility"
-              ? { round: "Round", reps: "Hold (sec)", weight: "Reps / sides" }
-              : { round: "Set", reps: "Reps", weight: "Weight (lb)" };
             const accent = session.kind === "mobility" ? "bg-amber-50 border-amber-200" : "bg-white border-slate-200";
             return (
               <div key={ex.id} className={`rounded-2xl border p-3 ${accent}`}>
@@ -235,18 +241,16 @@ export default async function PatientSessionDetail({
                   </div>
                 )}
 
-                <div className="grid grid-cols-12 gap-2 text-[10px] uppercase tracking-wide text-slate-500 font-semibold">
-                  <div className="col-span-3">{labels.round}</div>
-                  <div className="col-span-4 text-center">{labels.reps}</div>
-                  <div className="col-span-5 text-center">{labels.weight}</div>
-                </div>
-                {ex.sets.map((s) => (
-                  <div key={s.id} className="grid grid-cols-12 gap-2 text-sm py-1 border-t border-slate-100">
-                    <div className="col-span-3 font-medium text-slate-700">#{s.setNumber}</div>
-                    <div className="col-span-4 tabular-nums text-center text-slate-800">{s.reps}</div>
-                    <div className="col-span-5 tabular-nums text-center text-slate-800">{s.weight}</div>
-                  </div>
-                ))}
+                {ex.sets.length > 0 && (
+                  <SetLogger
+                    kind={session.kind === "mobility" ? "mobility" : "strength"}
+                    sessionId={session.id}
+                    day={day}
+                    logDate={logDate}
+                    sets={ex.sets}
+                    logs={setLogs}
+                  />
+                )}
               </div>
             );
           })}

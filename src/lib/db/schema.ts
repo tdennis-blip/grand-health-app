@@ -17,9 +17,11 @@ import {
   jsonb,
   boolean,
   timestamp,
+  date,
   pgEnum,
   primaryKey,
   index,
+  unique,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -455,6 +457,30 @@ export const sessionSets = pgTable(
   },
   (t) => ({
     seIdx: index("session_sets_se_idx").on(t.sessionExerciseId),
+  })
+);
+
+// Patient-logged actual performance per prescribed set (reps/weight/done),
+// one row per (patient, set, date). Clinicians read; patients write own.
+export const exerciseSetLogs = pgTable(
+  "exercise_set_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clinicId: uuid("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
+    patientId: uuid("patient_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+    sessionId: uuid("session_id").notNull().references(() => sessionLibrary.id, { onDelete: "cascade" }),
+    setId: uuid("set_id").notNull().references(() => sessionSets.id, { onDelete: "cascade" }),
+    logDate: date("log_date").notNull(),
+    actualReps: integer("actual_reps"),
+    actualWeight: integer("actual_weight"),
+    done: boolean("done").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    patientDateIdx: index("exercise_set_logs_patient_date_idx").on(t.patientId, t.logDate),
+    sessionIdx: index("exercise_set_logs_session_idx").on(t.sessionId),
+    uniqPatientSetDate: unique("exercise_set_logs_patient_set_date_key").on(t.patientId, t.setId, t.logDate),
   })
 );
 

@@ -219,3 +219,34 @@ export async function getSessionDetail(sessionId: string): Promise<SessionDetail
     })),
   };
 }
+
+export type SetLog = {
+  setId: string;
+  actualReps: number | null;
+  actualWeight: number | null;
+  done: boolean;
+};
+
+// Patient's logged actuals for a session on a given date, keyed by set id.
+export async function getSetLogsForSession(
+  sessionId: string,
+  logDate: string
+): Promise<Record<string, SetLog>> {
+  const user = await getUser();
+  if (!user) return {};
+  const rows = await withAuth(user, (sql) =>
+    sql`SELECT set_id, actual_reps, actual_weight, done
+        FROM exercise_set_logs
+        WHERE patient_id = ${user.id} AND session_id = ${sessionId} AND log_date = ${logDate}`
+  );
+  const map: Record<string, SetLog> = {};
+  rows.forEach((r: any) => {
+    map[r.set_id] = {
+      setId: r.set_id,
+      actualReps: r.actual_reps,
+      actualWeight: r.actual_weight,
+      done: r.done,
+    };
+  });
+  return map;
+}
