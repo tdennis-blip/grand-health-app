@@ -4,7 +4,25 @@ Living orientation doc for the production app. **Read this first** when picking 
 
 ---
 
-## 🚧 ACTIVE: Staging deploy migration (handoff — updated 2026-06-10)
+## ✅ LIVE: Staging on HTTPS at https://staging.mygrandhealth.com (updated 2026-06-16)
+
+**Status: fully live and validated end-to-end.** Logged in successfully over HTTPS as a clinician test user — DNS → ALB → ACM/HTTPS → Fargate → Cognito → RDS all confirmed working.
+
+- **App URL:** `https://staging.mygrandhealth.com` (HTTP redirects to HTTPS)
+- **RDS endpoint:** `grandhealthstack-postgres9dc8bb04-1ez67niaci4f.ce1muwi8yqjt.us-east-1.rds.amazonaws.com`
+- **DNS:** `mygrandhealth.com` is on **Squarespace**. The `staging` subdomain is delegated to Route 53 via four `NS` records (Host `staging`) pointing at: ns-1533.awsdns-63.org, ns-1833.awsdns-37.co.uk, ns-247.awsdns-30.com, ns-606.awsdns-11.net. ACM cert auto-validates through that delegated zone.
+- **CI/CD live:** push to `main` → GitHub Actions builds image → ECR → rolls the ECS service (`.github/workflows/deploy.yml`). GitHub repo has secret `AWS_DEPLOY_ROLE_ARN` + var `NEXT_PUBLIC_SITE_URL=https://staging.mygrandhealth.com`.
+- **Secret `grand-health/staging/app-env`:** real `DATABASE_URL`/`SERVICE_ROLE_DATABASE_URL` (RDS endpoint, sslmode=require), `USDA_API_KEY=DEMO_KEY`, Cloudinary name+key. **Still `REPLACE_ME`:** `ANTHROPIC_API_KEY` (chat) + `CLOUDINARY_API_SECRET` (image upload) — fill via `put-secret-value` then `aws ecs update-service --cluster grand-health-staging --service grand-health-staging-web --force-new-deployment`.
+- **Test users:** created via `scripts/create-test-user.sh` (Cognito) + manual `profiles`/`*_profiles` insert over the bastion tunnel (script prints the SQL when `DIRECT_DATABASE_URL` is unset). Clinician `nurse@grandhealth.local` exists.
+- **Redeploy with domain (idempotent):** `cd infra && npx cdk deploy -c stage=staging -c withService=true -c domain=staging.mygrandhealth.com -c hostedZone=staging.mygrandhealth.com`.
+
+**Remaining (optional):** fill the two `REPLACE_ME` secrets (Anthropic, Cloudinary secret); add a patient test user; run `docs/staging-smoke-test.md`.
+
+Full ordered runbook: `docs/deploy-staging-runbook.md`.
+
+---
+
+## Original plan / context (Staging deploy migration)
 
 **Goal:** get the app live on a shared URL for internal testing, HIPAA-compliant, AWS + GitHub.
 

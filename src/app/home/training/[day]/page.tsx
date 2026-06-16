@@ -29,7 +29,21 @@ export default async function PatientSessionDetail({ params }: { params: Promise
   if (!DAY_KEYS.includes(day)) notFound();
 
   const assignment = await getActiveAssignment();
-  if (!assignment) notFound();
+  if (!assignment) {
+    return (
+      <main className="max-w-md mx-auto px-5 py-5 space-y-4">
+        <Link href="/home/training" className="text-sm text-teal-700 inline-flex items-center gap-1">
+          <ChevronLeft size={14} /> Back to week
+        </Link>
+        <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-5 text-center">
+          <div className="text-sm font-semibold text-slate-900">No training program yet</div>
+          <div className="text-[12px] text-slate-500 leading-snug mt-1">
+            Your clinician hasn&apos;t assigned a program. Check back after your next visit.
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   const week = await getWeekSchedule(assignment.programId);
   const todaysSlot = week.find((w) => w.day === day);
