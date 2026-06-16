@@ -478,14 +478,16 @@ export const programLibrary = pgTable(
 export const programDays = pgTable(
   "program_days",
   {
+    id: uuid("id").defaultRandom().primaryKey(),
     programId: uuid("program_id")
       .notNull()
       .references(() => programLibrary.id, { onDelete: "cascade" }),
     day: dayKey("day").notNull(),
     sessionId: uuid("session_id").references(() => sessionLibrary.id, { onDelete: "set null" }),
+    sortOrder: integer("sort_order").notNull().default(0),
   },
   (t) => ({
-    pk: primaryKey({ columns: [t.programId, t.day] }),
+    programDayIdx: index("program_days_program_day_idx").on(t.programId, t.day, t.sortOrder),
   })
 );
 

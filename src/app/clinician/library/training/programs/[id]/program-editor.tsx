@@ -1,7 +1,14 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import { updateProgramHeader, setProgramDay } from "../actions";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { ChevronUp, ChevronDown, X } from "lucide-react";
+import {
+  updateProgramHeader,
+  addProgramDaySession,
+  removeProgramDaySession,
+  moveProgramDaySession,
+} from "../actions";
 
 type Kind = "strength" | "zone2" | "vo2max" | "mobility";
 type Day = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
@@ -32,6 +39,8 @@ type Session = {
   workMin: number | null;
 };
 
+type DayRow = { rowId: string; sessionId: string };
+
 export function ProgramEditor({
   programId,
   initial,
@@ -40,12 +49,12 @@ export function ProgramEditor({
 }: {
   programId: string;
   initial: { name: string; description: string | null };
-  initialDays: Record<Day, string | null>;
+  initialDays: Record<Day, DayRow[]>;
   sessions: Session[];
 }) {
+  const router = useRouter();
   const [name, setName] = useState(initial.name);
   const [description, setDescription] = useState(initial.description ?? "");
-  const [days, setDays] = useState<Record<Day, string | null>>(initialDays);
   const [headerPending, startHeaderTransition] = useTransition();
   const [dayPending, startDayTransition] = useTransition();
   const [headerSaved, setHeaderSaved] = useState(false);
@@ -56,43 +65,47 @@ export function ProgramEditor({
   const saveHeader = () => {
     setHeaderSaved(false);
     startHeaderTransition(async () => {
-      await updateProgramHeader({
-        id: programId,
-        name,
-        description: description || null,
-      });
+      await updateProgramHeader({ id: programId, name, description: description || null });
       setHeaderSaved(true);
     });
   };
 
-  const updateDay = (day: Day, sessionId: string | null) => {
-    // Optimistic local update + server save.
-    setDays((p) => ({ ...p, [day]: sessionId }));
+  const sessionById = (id: string) => sessions.find((s) => s.id === id) ?? null;
+
+  const addSession = (day: Day, sessionId: string) => {
+    if (!sessionId) return;
     startDayTransition(async () => {
-      await setProgramDay({ programId, day, sessionId });
+      await addProgramDaySession({ programId, day, sessionId });
+      router.refresh();
+    });
+  };
+  const removeRow = (rowId: string) => {
+    startDayTransition(async () => {
+      await removeProgramDaySession({ programId, rowId });
+      router.refresh();
+    });
+  };
+  const moveRow = (rowId: string, direction: "up" | "down") => {
+    startDayTransition(async () => {
+      await moveProgramDaySession({ programId, rowId, direction });
+      router.refresh();
     });
   };
 
-  // Weekly summary math
-  const summary = useMemo(() => {
-    let strength = 0, mobility = 0;
-    let zone2Min = 0, vo2Min = 0, totalMin = 0;
-    DAY_KEYS.forEach((d) => {
-      const sid = days[d];
-      if (!sid) return;
-      const sess = sessions.find((s) => s.id === sid);
-      if (!sess) return;
-      totalMin += sess.estMinutes;
-      if (sess.kind === "strength") strength += 1;
-      else if (sess.kind === "mobility") mobility += 1;
-      else if (sess.kind === "zone2") zone2Min += sess.durationMin ?? sess.estMinutes;
-      else if (sess.kind === "vo2max") vo2Min += (sess.rounds ?? 0) * (sess.workMin ?? 0);
-    });
-    const filled = DAY_KEYS.filter((d) => days[d]).length;
-    return { strength, mobility, zone2Min, vo2Min, totalMin, filled };
-  }, [days, sessions]);
+  // Weekly summary math — sum across every session on every day.
+  const allRows = DAY_KEYS.flatMap((d) => initialDays[d]);
+  let strength = 0, mobility = 0, zone2Min = 0, vo2Min = 0, totalMin = 0;
+  allRows.forEach((r) => {
+    const sess = sessionById(r.sessionId);
+    if (!sess) return;
+    totalMin += sess.estMinutes;
+    if (sess.kind === "strength") strength += 1;
+    else if (sess.kind === "mobility") mobility += 1;
+    else if (sess.kind === "zone2") zone2Min += sess.durationMin ?? sess.estMinutes;
+    else if (sess.kind === "vo2max") vo2Min += (sess.rounds ?? 0) * (sess.workMin ?? 0);
+  });
+  const restDays = DAY_KEYS.filter((d) => initialDays[d].length === 0).length;
 
-  // Sessions grouped by kind for the optgroups.
   const grouped: Record<Kind, Session[]> = {
     strength: sessions.filter((s) => s.kind === "strength"),
     zone2:    sessions.filter((s) => s.kind === "zone2"),
@@ -144,11 +157,9 @@ export function ProgramEditor({
 
       {/* Weekly schedule */}
       <section className="bg-white rounded-2xl border border-slate-200 p-5">
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <div>
-            <div className="text-sm font-semibold text-slate-900">Weekly schedule</div>
-            <div className="text-[11px] text-slate-500">Pick a saved session for each day, or leave as Rest. Saves automatically.</div>
-          </div>
+        <div className="mb-3">
+          <div className="text-sm font-semibold text-slate-900">Weekly schedule</div>
+          <div className="text-[11px] text-slate-500">Add one or more sessions to each day. Days with no sessions are rest days. Saves automatically.</div>
         </div>
 
         {sessions.length === 0 && (
@@ -159,46 +170,63 @@ export function ProgramEditor({
 
         <div className="space-y-2">
           {DAY_KEYS.map((day) => {
-            const sid = days[day];
-            const sess = sid ? sessions.find((s) => s.id === sid) ?? null : null;
-            const kindLabel = sess ? KIND_LABEL[sess.kind] : "Rest";
-            const badgeCls = sess ? KIND_BADGE[sess.kind] : "bg-slate-50 text-slate-500 border-slate-200";
+            const rows = initialDays[day];
             return (
-              <div key={day} className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center gap-2">
-                <span className="w-12 text-[11px] uppercase tracking-wide font-bold text-slate-700 flex-shrink-0">
+              <div key={day} className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex gap-3">
+                <span className="w-12 text-[11px] uppercase tracking-wide font-bold text-slate-700 flex-shrink-0 pt-1.5">
                   {DAY_LABELS[day]}
                 </span>
-                <select
-                  value={sid ?? ""}
-                  onChange={(e) => updateDay(day, e.target.value || null)}
-                  disabled={dayPending || sessions.length === 0}
-                  className="flex-1 text-sm font-semibold text-slate-900 border border-slate-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:border-teal-500"
-                >
-                  <option value="">Rest day</option>
-                  <optgroup label="Strength">
-                    {grouped.strength.map((s) => (
-                      <option key={s.id} value={s.id}>{s.name} (~{s.estMinutes}m)</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Zone 2">
-                    {grouped.zone2.map((s) => (
-                      <option key={s.id} value={s.id}>{s.name} (~{s.estMinutes}m)</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="VO₂ max">
-                    {grouped.vo2max.map((s) => (
-                      <option key={s.id} value={s.id}>{s.name} (~{s.estMinutes}m)</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Mobility">
-                    {grouped.mobility.map((s) => (
-                      <option key={s.id} value={s.id}>{s.name} (~{s.estMinutes}m)</option>
-                    ))}
-                  </optgroup>
-                </select>
-                <span className={`text-[10px] font-semibold px-2 py-1 rounded border ${badgeCls} flex-shrink-0`}>
-                  {kindLabel}
-                </span>
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  {rows.length === 0 && (
+                    <div className="text-[12px] text-slate-400 italic py-1">Rest day</div>
+                  )}
+                  {rows.map((r, idx) => {
+                    const sess = sessionById(r.sessionId);
+                    if (!sess) return null;
+                    return (
+                      <div key={r.rowId} className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2 py-1.5">
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border flex-shrink-0 ${KIND_BADGE[sess.kind]}`}>
+                          {KIND_LABEL[sess.kind]}
+                        </span>
+                        <span className="text-sm font-semibold text-slate-900 truncate flex-1">
+                          {sess.name} <span className="text-[11px] text-slate-400 font-normal">~{sess.estMinutes}m</span>
+                        </span>
+                        <button type="button" onClick={() => moveRow(r.rowId, "up")} disabled={dayPending || idx === 0}
+                          className="text-slate-400 hover:text-slate-700 disabled:opacity-30" aria-label="Move up">
+                          <ChevronUp size={15} />
+                        </button>
+                        <button type="button" onClick={() => moveRow(r.rowId, "down")} disabled={dayPending || idx === rows.length - 1}
+                          className="text-slate-400 hover:text-slate-700 disabled:opacity-30" aria-label="Move down">
+                          <ChevronDown size={15} />
+                        </button>
+                        <button type="button" onClick={() => removeRow(r.rowId)} disabled={dayPending}
+                          className="text-slate-400 hover:text-rose-600 disabled:opacity-30" aria-label="Remove">
+                          <X size={15} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                  <select
+                    value=""
+                    onChange={(e) => { addSession(day, e.target.value); e.target.value = ""; }}
+                    disabled={dayPending || sessions.length === 0}
+                    className="w-full text-[13px] text-slate-600 border border-dashed border-slate-300 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:border-teal-500"
+                  >
+                    <option value="">+ Add session…</option>
+                    <optgroup label="Strength">
+                      {grouped.strength.map((s) => (<option key={s.id} value={s.id}>{s.name} (~{s.estMinutes}m)</option>))}
+                    </optgroup>
+                    <optgroup label="Zone 2">
+                      {grouped.zone2.map((s) => (<option key={s.id} value={s.id}>{s.name} (~{s.estMinutes}m)</option>))}
+                    </optgroup>
+                    <optgroup label="VO₂ max">
+                      {grouped.vo2max.map((s) => (<option key={s.id} value={s.id}>{s.name} (~{s.estMinutes}m)</option>))}
+                    </optgroup>
+                    <optgroup label="Mobility">
+                      {grouped.mobility.map((s) => (<option key={s.id} value={s.id}>{s.name} (~{s.estMinutes}m)</option>))}
+                    </optgroup>
+                  </select>
+                </div>
               </div>
             );
           })}
@@ -209,14 +237,14 @@ export function ProgramEditor({
       <section className="bg-teal-50 border border-teal-200 rounded-2xl p-4">
         <div className="text-[11px] uppercase tracking-wide text-teal-800 font-semibold mb-3">Weekly summary</div>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-center">
-          <SumCell label="Strength" value={`${summary.strength}`} />
-          <SumCell label="Zone 2"   value={`${summary.zone2Min}m`} />
-          <SumCell label="VO₂ max work" value={`${summary.vo2Min}m`} />
-          <SumCell label="Mobility flows" value={`${summary.mobility}`} />
-          <SumCell label="Total time" value={`${summary.totalMin}m`} />
+          <SumCell label="Strength" value={`${strength}`} />
+          <SumCell label="Zone 2"   value={`${zone2Min}m`} />
+          <SumCell label="VO₂ max work" value={`${vo2Min}m`} />
+          <SumCell label="Mobility flows" value={`${mobility}`} />
+          <SumCell label="Total time" value={`${totalMin}m`} />
         </div>
         <div className="text-[11px] text-slate-600 mt-3">
-          {summary.filled} session{summary.filled === 1 ? "" : "s"}/wk · {7 - summary.filled} rest day{7 - summary.filled === 1 ? "" : "s"}
+          {allRows.length} session{allRows.length === 1 ? "" : "s"}/wk · {restDays} rest day{restDays === 1 ? "" : "s"}
         </div>
       </section>
     </>

@@ -23,8 +23,15 @@ const KIND_TILE = {
   mobility: "from-amber-500 to-orange-500",
 } as const;
 
-export default async function PatientSessionDetail({ params }: { params: Promise<{ day: string }> }) {
+export default async function PatientSessionDetail({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ day: string }>;
+  searchParams: Promise<{ s?: string }>;
+}) {
   const { day: dayParam } = await params;
+  const { s } = await searchParams;
   const day = dayParam as DayKey;
   if (!DAY_KEYS.includes(day)) notFound();
 
@@ -46,8 +53,10 @@ export default async function PatientSessionDetail({ params }: { params: Promise
   }
 
   const week = await getWeekSchedule(assignment.programId);
-  const todaysSlot = week.find((w) => w.day === day);
-  if (!todaysSlot?.session) {
+  const slot = week.find((w) => w.day === day);
+  const daySessions = slot?.sessions ?? [];
+
+  if (daySessions.length === 0) {
     return (
       <main className="max-w-md mx-auto px-5 py-5 space-y-4">
         <Link href="/home/training" className="text-sm text-teal-700 inline-flex items-center gap-1">
@@ -64,7 +73,49 @@ export default async function PatientSessionDetail({ params }: { params: Promise
     );
   }
 
-  const session = await getSessionDetail(todaysSlot.session.id);
+  // Choose which session to show: explicit ?s=, otherwise the only one.
+  let picked = s ? daySessions.find((x) => x.id === s) : undefined;
+  if (!picked && daySessions.length === 1) picked = daySessions[0];
+
+  // Multiple sessions and none specified — let the patient pick.
+  if (!picked) {
+    return (
+      <main className="max-w-md mx-auto px-5 py-5 space-y-4">
+        <Link href="/home/training" className="text-sm text-teal-700 inline-flex items-center gap-1">
+          <ChevronLeft size={14} /> Back to week
+        </Link>
+        <div>
+          <div className="text-xs uppercase tracking-wide text-slate-500">{DAY_LABELS[day]}</div>
+          <div className="text-base font-semibold text-slate-900">{daySessions.length} sessions today</div>
+        </div>
+        <div className="space-y-2">
+          {daySessions.map((sx) => {
+            const Icon = KIND_ICON[sx.kind];
+            const gradient = sx.accent || KIND_TILE[sx.kind];
+            return (
+              <Link
+                key={sx.id}
+                href={`/home/training/${day}?s=${sx.id}`}
+                className="block rounded-2xl border border-slate-200 bg-white p-3 flex items-center gap-3 hover:border-teal-300"
+              >
+                <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${gradient} text-white flex items-center justify-center flex-shrink-0`}>
+                  <Icon size={18} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-slate-900 truncate">{sx.name}</div>
+                  <div className="text-[11px] text-slate-500 truncate">
+                    {KIND_LABEL[sx.kind]} · {sx.focus || `~${sx.estMinutes}m`}
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </main>
+    );
+  }
+
+  const session = await getSessionDetail(picked.id);
   if (!session) notFound();
 
   const Icon = KIND_ICON[session.kind];

@@ -148,7 +148,7 @@ function scoreSleep(
 
 function scoreTraining(
   todaySession:
-    | { session: { name: string; estMinutes: number } | null; day: string }
+    | { sessions: { name: string; estMinutes: number }[]; day: string }
     | undefined
 ): DomainScore {
   // No completion tracking yet — we score boolean: scheduled vs rest. A
@@ -158,13 +158,15 @@ function scoreTraining(
   if (!todaySession) {
     return { value: null, caption: "No program assigned" };
   }
-  if (!todaySession.session) {
+  const sessions = todaySession.sessions ?? [];
+  if (sessions.length === 0) {
     return { value: 100, caption: "Rest day — recovery is part of the plan", ok: true };
   }
-  return {
-    value: 50,
-    caption: `${todaySession.session.name} · ~${todaySession.session.estMinutes}m`,
-  };
+  if (sessions.length === 1) {
+    return { value: 50, caption: `${sessions[0].name} · ~${sessions[0].estMinutes}m` };
+  }
+  const totalMin = sessions.reduce((sum, s) => sum + s.estMinutes, 0);
+  return { value: 50, caption: `${sessions.length} sessions · ~${totalMin}m` };
 }
 
 // ---------------------------------------------------------------------------

@@ -397,6 +397,36 @@
       ]
     }
   ],
+  "/GrandHealthStack/AppRuntime/AlbUrl": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppRuntimeAlbUrl84D822DF"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new AppRuntime (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/app-runtime.ts:232:5)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:226:5)",
+        "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/GrandHealthStack/AppRuntime/AlbDnsName": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppRuntimeAlbDnsName0027791C"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new AppRuntime (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/app-runtime.ts:240:5)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:226:5)",
+        "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
   "/GrandHealthStack/Custom::AWSCDKOpenIdConnectProviderCustomResourceProvider/Role": [
     {
       "type": "aws:cdk:logicalId",
@@ -911,6 +941,124 @@
       ]
     }
   ],
+  "/GrandHealthStack/AppRuntime/Cluster/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppRuntimeClusterE379B5B2"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new Cluster2 in aws-cdk-lib...",
+        "new AppRuntime (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/app-runtime.ts:139:21)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:226:5)",
+        "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/GrandHealthStack/AppRuntime/Logs/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppRuntimeLogs9E701BA2"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new LogGroup2 in aws-cdk-lib...",
+        "new AppRuntime (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/app-runtime.ts:145:22)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:226:5)",
+        "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/GrandHealthStack/AppRuntime/Cert/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppRuntimeCertF240D67F"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new Certificate2 in aws-cdk-lib...",
+        "new AppRuntime (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/app-runtime.ts:161:21)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:226:5)",
+        "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/GrandHealthStack/AppRuntime/Service/LoadBalancerDNS": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppRuntimeServiceLoadBalancerDNS50C3F8F0"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new ApplicationLoadBalancedFargateService2 in aws-cdk-lib...",
+        "new AppRuntime (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/app-runtime.ts:190:21)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:226:5)",
+        "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/GrandHealthStack/AppRuntime/Service/ServiceURL": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppRuntimeServiceServiceURLED157155"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new ApplicationLoadBalancedFargateService2 in aws-cdk-lib...",
+        "new AppRuntime (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/app-runtime.ts:190:21)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:226:5)",
+        "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/GrandHealthStack/AppRuntime/Service/Service": [
+    {
+      "type": "aws:cdk:warning",
+      "data": "minHealthyPercent has not been configured so the default value of 50% is used. The number of running tasks will decrease below the desired count during deployments etc. See https://github.com/aws/aws-cdk/issues/31705 [ack: @aws-cdk/aws-ecs:minHealthyPercent]",
+      "trace": [
+        "Annotations.addMessage (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/node_modules/aws-cdk-lib/core/lib/annotations.js:1:2399)",
+        "Annotations.addWarningV2 (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/node_modules/aws-cdk-lib/core/lib/annotations.js:1:1087)",
+        "new BaseService2 (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/node_modules/aws-cdk-lib/aws-ecs/lib/base/base-service.js:1:14478)",
+        "new BaseService2 (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/node_modules/aws-cdk-lib/core/lib/no-box-stack-traces.js:1:345)",
+        "new FargateService2 (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/node_modules/aws-cdk-lib/aws-ecs/lib/fargate/fargate-service.js:1:6805)",
+        "new FargateService2 (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/node_modules/aws-cdk-lib/core/lib/prop-injectable.js:1:855)",
+        "new ApplicationLoadBalancedFargateService2 (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/node_modules/aws-cdk-lib/aws-ecs-patterns/lib/fargate/application-load-balanced-fargate-service.js:1:6392)",
+        "new ApplicationLoadBalancedFargateService2 (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/node_modules/aws-cdk-lib/core/lib/prop-injectable.js:1:855)",
+        "new AppRuntime (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/app-runtime.ts:190:21)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:226:5)",
+        "Object.<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
+        "Module._compile (node:internal/modules/cjs/loader:1830:14)",
+        "Module.m._compile (/Users/tobinoffice/.npm/_npx/1bf7c3c15bf47d04/node_modules/ts-node/src/index.ts:1618:23)",
+        "node:internal/modules/cjs/loader:1961:10",
+        "Object.require.extensions.<computed> [as .ts] (/Users/tobinoffice/.npm/_npx/1bf7c3c15bf47d04/node_modules/ts-node/src/index.ts:1621:12)",
+        "Module.load (node:internal/modules/cjs/loader:1553:32)",
+        "Module._load (node:internal/modules/cjs/loader:1355:12)",
+        "wrapModuleLoad (node:internal/modules/cjs/loader:255:19)",
+        "Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)",
+        "phase4 (/Users/tobinoffice/.npm/_npx/1bf7c3c15bf47d04/node_modules/ts-node/src/bin.ts:649:14)",
+        "bootstrap (/Users/tobinoffice/.npm/_npx/1bf7c3c15bf47d04/node_modules/ts-node/src/bin.ts:95:10)",
+        "main (/Users/tobinoffice/.npm/_npx/1bf7c3c15bf47d04/node_modules/ts-node/src/bin.ts:55:10)",
+        "Object.<anonymous> (/Users/tobinoffice/.npm/_npx/1bf7c3c15bf47d04/node_modules/ts-node/src/bin.ts:800:3)",
+        "Module._compile (node:internal/modules/cjs/loader:1830:14)",
+        "Object.<anonymous> (node:internal/modules/cjs/loader:1961:10)",
+        "Module.load (node:internal/modules/cjs/loader:1553:32)",
+        "Module._load (node:internal/modules/cjs/loader:1355:12)",
+        "wrapModuleLoad (node:internal/modules/cjs/loader:255:19)",
+        "Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)",
+        "node:internal/main/run_main_module:33:47"
+      ]
+    }
+  ],
   "/GrandHealthStack/AppRuntime/GithubOidc/Resource/Default": [
     {
       "type": "aws:cdk:logicalId",
@@ -937,6 +1085,202 @@
       "data": [
         "...WrappedClass.grantPullPush in aws-cdk-lib...",
         "new AppRuntime (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/app-runtime.ts:102:21)"
+      ]
+    }
+  ],
+  "/GrandHealthStack/AppRuntime/Service/LB/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppRuntimeServiceLBF3652A40"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new ApplicationLoadBalancedFargateService2 in aws-cdk-lib...",
+        "new AppRuntime (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/app-runtime.ts:190:21)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:226:5)",
+        "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
+        "...node internals..."
+      ]
+    }
+  ],
+  "/GrandHealthStack/AppRuntime/Service/DNS/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppRuntimeServiceDNSAD686F3C"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new ApplicationLoadBalancedFargateService2 in aws-cdk-lib...",
+        "new AppRuntime (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/app-runtime.ts:190:21)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:226:5)",
+        "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)"
+      ]
+    }
+  ],
+  "/GrandHealthStack/AppRuntime/Service/TaskDef/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppRuntimeServiceTaskDef0C4908FB"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new ApplicationLoadBalancedFargateService2 in aws-cdk-lib...",
+        "new AppRuntime (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/app-runtime.ts:190:21)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:226:5)",
+        "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
+        "...node internals..."
+      ]
+    }
+  ],
+  "/GrandHealthStack/AppRuntime/Service/Service/Service": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppRuntimeService14F2B184"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new ApplicationLoadBalancedFargateService2 in aws-cdk-lib...",
+        "new AppRuntime (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/app-runtime.ts:190:21)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:226:5)",
+        "<anonymous> (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/bin/app.ts:8:1)",
+        "...node internals..."
+      ]
+    }
+  ],
+  "/GrandHealthStack/AppRuntime/Service/LB/SecurityGroup/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppRuntimeServiceLBSecurityGroupE2AEF7F3"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new ApplicationLoadBalancedFargateService2 in aws-cdk-lib...",
+        "new AppRuntime (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/app-runtime.ts:190:21)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:226:5)"
+      ]
+    }
+  ],
+  "/GrandHealthStack/AppRuntime/Service/LB/SecurityGroup/to GrandHealthStackAppRuntimeServiceSecurityGroupE80A075D:3000": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppRuntimeServiceLBSecurityGrouptoGrandHealthStackAppRuntimeServiceSecurityGroupE80A075D30001CFF5FBC"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib...",
+        "(no user code in 10 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/GrandHealthStack/AppRuntime/Service/LB/PublicListener/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppRuntimeServiceLBPublicListener7F2FF880"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib...",
+        "(no user code in 10 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/GrandHealthStack/AppRuntime/Service/LB/PublicRedirectListener/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppRuntimeServiceLBPublicRedirectListener8293407F"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib...",
+        "(no user code in 10 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/GrandHealthStack/AppRuntime/Service/TaskDef/TaskRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppRuntimeServiceTaskDefTaskRoleE4FC7E65"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new ApplicationLoadBalancedFargateService2 in aws-cdk-lib...",
+        "new AppRuntime (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/app-runtime.ts:190:21)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:226:5)"
+      ]
+    }
+  ],
+  "/GrandHealthStack/AppRuntime/Service/TaskDef/ExecutionRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppRuntimeServiceTaskDefExecutionRole345B3A05"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib...",
+        "(no user code in 10 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/GrandHealthStack/AppRuntime/Service/Service/SecurityGroup/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppRuntimeServiceSecurityGroupE256CDE4"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new ApplicationLoadBalancedFargateService2 in aws-cdk-lib...",
+        "new AppRuntime (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/app-runtime.ts:190:21)",
+        "new GrandHealthStack (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/grand-health-stack.ts:226:5)"
+      ]
+    }
+  ],
+  "/GrandHealthStack/AppRuntime/Service/Service/SecurityGroup/from GrandHealthStackAppRuntimeServiceLBSecurityGroupC799387B:3000": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppRuntimeServiceSecurityGroupfromGrandHealthStackAppRuntimeServiceLBSecurityGroupC799387B3000CC491C87"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib...",
+        "(no user code in 10 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/GrandHealthStack/AppRuntime/Service/LB/PublicListener/ECSGroup/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppRuntimeServiceLBPublicListenerECSGroup4BEF7E2D"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new ApplicationLoadBalancedFargateService2 in aws-cdk-lib...",
+        "new AppRuntime (/Users/tobinoffice/Desktop/AI Projects/Grand Health/App/grand-health-app/infra/lib/app-runtime.ts:190:21)"
+      ]
+    }
+  ],
+  "/GrandHealthStack/AppRuntime/Service/TaskDef/ExecutionRole/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppRuntimeServiceTaskDefExecutionRoleDefaultPolicy7BD1F848"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib...",
+        "(no user code in 10 frames, use --stack-trace-limit to capture more)"
       ]
     }
   ]

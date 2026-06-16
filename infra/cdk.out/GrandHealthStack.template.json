@@ -1489,6 +1489,856 @@
     "aws:cdk:path": "GrandHealthStack/AppRuntime/GithubDeployRole/DefaultPolicy/Resource"
    }
   },
+  "AppRuntimeClusterE379B5B2": {
+   "Type": "AWS::ECS::Cluster",
+   "Properties": {
+    "ClusterName": "grand-health-staging",
+    "ClusterSettings": [
+     {
+      "Name": "containerInsights",
+      "Value": "enabled"
+     }
+    ],
+    "Tags": [
+     {
+      "Key": "PHI",
+      "Value": "true"
+     },
+     {
+      "Key": "Project",
+      "Value": "GrandHealth"
+     },
+     {
+      "Key": "Stage",
+      "Value": "staging"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "GrandHealthStack/AppRuntime/Cluster/Resource"
+   }
+  },
+  "AppRuntimeLogs9E701BA2": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "LogGroupName": "/grand-health/staging/web",
+    "RetentionInDays": 30,
+    "Tags": [
+     {
+      "Key": "PHI",
+      "Value": "true"
+     },
+     {
+      "Key": "Project",
+      "Value": "GrandHealth"
+     },
+     {
+      "Key": "Stage",
+      "Value": "staging"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "GrandHealthStack/AppRuntime/Logs/Resource"
+   }
+  },
+  "AppRuntimeCertF240D67F": {
+   "Type": "AWS::CertificateManager::Certificate",
+   "Properties": {
+    "DomainName": "staging.mygrandhealth.com",
+    "DomainValidationOptions": [
+     {
+      "DomainName": "staging.mygrandhealth.com",
+      "HostedZoneId": "Z05973802GJWFEX2UMVDA"
+     }
+    ],
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "GrandHealthStack/AppRuntime/Cert"
+     },
+     {
+      "Key": "PHI",
+      "Value": "true"
+     },
+     {
+      "Key": "Project",
+      "Value": "GrandHealth"
+     },
+     {
+      "Key": "Stage",
+      "Value": "staging"
+     }
+    ],
+    "ValidationMethod": "DNS"
+   },
+   "Metadata": {
+    "aws:cdk:path": "GrandHealthStack/AppRuntime/Cert/Resource"
+   }
+  },
+  "AppRuntimeServiceLBF3652A40": {
+   "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+   "Properties": {
+    "LoadBalancerAttributes": [
+     {
+      "Key": "deletion_protection.enabled",
+      "Value": "false"
+     }
+    ],
+    "Scheme": "internet-facing",
+    "SecurityGroups": [
+     {
+      "Fn::GetAtt": [
+       "AppRuntimeServiceLBSecurityGroupE2AEF7F3",
+       "GroupId"
+      ]
+     }
+    ],
+    "Subnets": [
+     {
+      "Ref": "VpcpublicSubnet1Subnet2BB74ED7"
+     },
+     {
+      "Ref": "VpcpublicSubnet2SubnetE34B022A"
+     }
+    ],
+    "Tags": [
+     {
+      "Key": "PHI",
+      "Value": "true"
+     },
+     {
+      "Key": "Project",
+      "Value": "GrandHealth"
+     },
+     {
+      "Key": "Stage",
+      "Value": "staging"
+     }
+    ],
+    "Type": "application"
+   },
+   "DependsOn": [
+    "VpcpublicSubnet1DefaultRouteB88F9E93",
+    "VpcpublicSubnet1RouteTableAssociation4E83B6E4",
+    "VpcpublicSubnet2DefaultRoute732F0BEB",
+    "VpcpublicSubnet2RouteTableAssociationCCE257FF"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "GrandHealthStack/AppRuntime/Service/LB/Resource"
+   }
+  },
+  "AppRuntimeServiceLBSecurityGroupE2AEF7F3": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "Automatically created Security Group for ELB GrandHealthStackAppRuntimeServiceLBAAABE1C1",
+    "SecurityGroupIngress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow from anyone on port 443",
+      "FromPort": 443,
+      "IpProtocol": "tcp",
+      "ToPort": 443
+     },
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow from anyone on port 80",
+      "FromPort": 80,
+      "IpProtocol": "tcp",
+      "ToPort": 80
+     }
+    ],
+    "Tags": [
+     {
+      "Key": "PHI",
+      "Value": "true"
+     },
+     {
+      "Key": "Project",
+      "Value": "GrandHealth"
+     },
+     {
+      "Key": "Stage",
+      "Value": "staging"
+     }
+    ],
+    "VpcId": {
+     "Ref": "Vpc8378EB38"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "GrandHealthStack/AppRuntime/Service/LB/SecurityGroup/Resource"
+   }
+  },
+  "AppRuntimeServiceLBSecurityGrouptoGrandHealthStackAppRuntimeServiceSecurityGroupE80A075D30001CFF5FBC": {
+   "Type": "AWS::EC2::SecurityGroupEgress",
+   "Properties": {
+    "Description": "Load balancer to target",
+    "DestinationSecurityGroupId": {
+     "Fn::GetAtt": [
+      "AppRuntimeServiceSecurityGroupE256CDE4",
+      "GroupId"
+     ]
+    },
+    "FromPort": 3000,
+    "GroupId": {
+     "Fn::GetAtt": [
+      "AppRuntimeServiceLBSecurityGroupE2AEF7F3",
+      "GroupId"
+     ]
+    },
+    "IpProtocol": "tcp",
+    "ToPort": 3000
+   },
+   "Metadata": {
+    "aws:cdk:path": "GrandHealthStack/AppRuntime/Service/LB/SecurityGroup/to GrandHealthStackAppRuntimeServiceSecurityGroupE80A075D:3000"
+   }
+  },
+  "AppRuntimeServiceLBPublicListener7F2FF880": {
+   "Type": "AWS::ElasticLoadBalancingV2::Listener",
+   "Properties": {
+    "Certificates": [
+     {
+      "CertificateArn": {
+       "Ref": "AppRuntimeCertF240D67F"
+      }
+     }
+    ],
+    "DefaultActions": [
+     {
+      "TargetGroupArn": {
+       "Ref": "AppRuntimeServiceLBPublicListenerECSGroup4BEF7E2D"
+      },
+      "Type": "forward"
+     }
+    ],
+    "LoadBalancerArn": {
+     "Ref": "AppRuntimeServiceLBF3652A40"
+    },
+    "Port": 443,
+    "Protocol": "HTTPS",
+    "SslPolicy": "ELBSecurityPolicy-2016-08"
+   },
+   "Metadata": {
+    "aws:cdk:path": "GrandHealthStack/AppRuntime/Service/LB/PublicListener/Resource"
+   }
+  },
+  "AppRuntimeServiceLBPublicListenerECSGroup4BEF7E2D": {
+   "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+   "Properties": {
+    "HealthCheckIntervalSeconds": 30,
+    "HealthCheckPath": "/login",
+    "HealthCheckTimeoutSeconds": 10,
+    "Matcher": {
+     "HttpCode": "200-399"
+    },
+    "Port": 80,
+    "Protocol": "HTTP",
+    "Tags": [
+     {
+      "Key": "PHI",
+      "Value": "true"
+     },
+     {
+      "Key": "Project",
+      "Value": "GrandHealth"
+     },
+     {
+      "Key": "Stage",
+      "Value": "staging"
+     }
+    ],
+    "TargetGroupAttributes": [
+     {
+      "Key": "stickiness.enabled",
+      "Value": "false"
+     }
+    ],
+    "TargetType": "ip",
+    "VpcId": {
+     "Ref": "Vpc8378EB38"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "GrandHealthStack/AppRuntime/Service/LB/PublicListener/ECSGroup/Resource"
+   }
+  },
+  "AppRuntimeServiceLBPublicRedirectListener8293407F": {
+   "Type": "AWS::ElasticLoadBalancingV2::Listener",
+   "Properties": {
+    "DefaultActions": [
+     {
+      "RedirectConfig": {
+       "Port": "443",
+       "Protocol": "HTTPS",
+       "StatusCode": "HTTP_301"
+      },
+      "Type": "redirect"
+     }
+    ],
+    "LoadBalancerArn": {
+     "Ref": "AppRuntimeServiceLBF3652A40"
+    },
+    "Port": 80,
+    "Protocol": "HTTP"
+   },
+   "DependsOn": [
+    "AppRuntimeServiceLBPublicListenerECSGroup4BEF7E2D",
+    "AppRuntimeServiceLBPublicListener7F2FF880"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "GrandHealthStack/AppRuntime/Service/LB/PublicRedirectListener/Resource"
+   }
+  },
+  "AppRuntimeServiceDNSAD686F3C": {
+   "Type": "AWS::Route53::RecordSet",
+   "Properties": {
+    "AliasTarget": {
+     "DNSName": {
+      "Fn::Join": [
+       "",
+       [
+        "dualstack.",
+        {
+         "Fn::GetAtt": [
+          "AppRuntimeServiceLBF3652A40",
+          "DNSName"
+         ]
+        }
+       ]
+      ]
+     },
+     "HostedZoneId": {
+      "Fn::GetAtt": [
+       "AppRuntimeServiceLBF3652A40",
+       "CanonicalHostedZoneID"
+      ]
+     }
+    },
+    "HostedZoneId": "Z05973802GJWFEX2UMVDA",
+    "Name": "staging.mygrandhealth.com.",
+    "Type": "A"
+   },
+   "Metadata": {
+    "aws:cdk:path": "GrandHealthStack/AppRuntime/Service/DNS/Resource"
+   }
+  },
+  "AppRuntimeServiceTaskDefTaskRoleE4FC7E65": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "ecs-tasks.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "Tags": [
+     {
+      "Key": "PHI",
+      "Value": "true"
+     },
+     {
+      "Key": "Project",
+      "Value": "GrandHealth"
+     },
+     {
+      "Key": "Stage",
+      "Value": "staging"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "GrandHealthStack/AppRuntime/Service/TaskDef/TaskRole/Resource"
+   }
+  },
+  "AppRuntimeServiceTaskDef0C4908FB": {
+   "Type": "AWS::ECS::TaskDefinition",
+   "Properties": {
+    "ContainerDefinitions": [
+     {
+      "Environment": [
+       {
+        "Name": "NODE_ENV",
+        "Value": "production"
+       },
+       {
+        "Name": "PORT",
+        "Value": "3000"
+       },
+       {
+        "Name": "NEXT_PUBLIC_AWS_REGION",
+        "Value": "us-east-1"
+       },
+       {
+        "Name": "NEXT_PUBLIC_COGNITO_USER_POOL_ID",
+        "Value": "us-east-1_Yk5gVyw4D"
+       },
+       {
+        "Name": "NEXT_PUBLIC_COGNITO_CLIENT_ID",
+        "Value": "n9pkk4kb0doa5hhspsv510ecq"
+       },
+       {
+        "Name": "NEXT_PUBLIC_SITE_URL",
+        "Value": "https://staging.mygrandhealth.com"
+       }
+      ],
+      "Essential": true,
+      "Image": {
+       "Fn::Join": [
+        "",
+        [
+         {
+          "Fn::Select": [
+           4,
+           {
+            "Fn::Split": [
+             ":",
+             {
+              "Fn::GetAtt": [
+               "AppRuntimeRepoE01ACDF4",
+               "Arn"
+              ]
+             }
+            ]
+           }
+          ]
+         },
+         ".dkr.ecr.",
+         {
+          "Fn::Select": [
+           3,
+           {
+            "Fn::Split": [
+             ":",
+             {
+              "Fn::GetAtt": [
+               "AppRuntimeRepoE01ACDF4",
+               "Arn"
+              ]
+             }
+            ]
+           }
+          ]
+         },
+         ".",
+         {
+          "Ref": "AWS::URLSuffix"
+         },
+         "/",
+         {
+          "Ref": "AppRuntimeRepoE01ACDF4"
+         },
+         ":latest"
+        ]
+       ]
+      },
+      "LogConfiguration": {
+       "LogDriver": "awslogs",
+       "Options": {
+        "awslogs-group": {
+         "Ref": "AppRuntimeLogs9E701BA2"
+        },
+        "awslogs-stream-prefix": "web",
+        "awslogs-region": "us-east-1"
+       }
+      },
+      "Name": "web",
+      "PortMappings": [
+       {
+        "ContainerPort": 3000,
+        "Protocol": "tcp"
+       }
+      ],
+      "Secrets": [
+       {
+        "Name": "DATABASE_URL",
+        "ValueFrom": {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Ref": "AppRuntimeAppEnv759C410D"
+           },
+           ":DATABASE_URL::"
+          ]
+         ]
+        }
+       },
+       {
+        "Name": "SERVICE_ROLE_DATABASE_URL",
+        "ValueFrom": {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Ref": "AppRuntimeAppEnv759C410D"
+           },
+           ":SERVICE_ROLE_DATABASE_URL::"
+          ]
+         ]
+        }
+       },
+       {
+        "Name": "USDA_API_KEY",
+        "ValueFrom": {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Ref": "AppRuntimeAppEnv759C410D"
+           },
+           ":USDA_API_KEY::"
+          ]
+         ]
+        }
+       },
+       {
+        "Name": "ANTHROPIC_API_KEY",
+        "ValueFrom": {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Ref": "AppRuntimeAppEnv759C410D"
+           },
+           ":ANTHROPIC_API_KEY::"
+          ]
+         ]
+        }
+       },
+       {
+        "Name": "CLOUDINARY_CLOUD_NAME",
+        "ValueFrom": {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Ref": "AppRuntimeAppEnv759C410D"
+           },
+           ":CLOUDINARY_CLOUD_NAME::"
+          ]
+         ]
+        }
+       },
+       {
+        "Name": "CLOUDINARY_API_KEY",
+        "ValueFrom": {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Ref": "AppRuntimeAppEnv759C410D"
+           },
+           ":CLOUDINARY_API_KEY::"
+          ]
+         ]
+        }
+       },
+       {
+        "Name": "CLOUDINARY_API_SECRET",
+        "ValueFrom": {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Ref": "AppRuntimeAppEnv759C410D"
+           },
+           ":CLOUDINARY_API_SECRET::"
+          ]
+         ]
+        }
+       }
+      ]
+     }
+    ],
+    "Cpu": "512",
+    "ExecutionRoleArn": {
+     "Fn::GetAtt": [
+      "AppRuntimeServiceTaskDefExecutionRole345B3A05",
+      "Arn"
+     ]
+    },
+    "Family": "grand-health-staging-web",
+    "Memory": "1024",
+    "NetworkMode": "awsvpc",
+    "RequiresCompatibilities": [
+     "FARGATE"
+    ],
+    "Tags": [
+     {
+      "Key": "PHI",
+      "Value": "true"
+     },
+     {
+      "Key": "Project",
+      "Value": "GrandHealth"
+     },
+     {
+      "Key": "Stage",
+      "Value": "staging"
+     }
+    ],
+    "TaskRoleArn": {
+     "Fn::GetAtt": [
+      "AppRuntimeServiceTaskDefTaskRoleE4FC7E65",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "GrandHealthStack/AppRuntime/Service/TaskDef/Resource"
+   }
+  },
+  "AppRuntimeServiceTaskDefExecutionRole345B3A05": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "ecs-tasks.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "Tags": [
+     {
+      "Key": "PHI",
+      "Value": "true"
+     },
+     {
+      "Key": "Project",
+      "Value": "GrandHealth"
+     },
+     {
+      "Key": "Stage",
+      "Value": "staging"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "GrandHealthStack/AppRuntime/Service/TaskDef/ExecutionRole/Resource"
+   }
+  },
+  "AppRuntimeServiceTaskDefExecutionRoleDefaultPolicy7BD1F848": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:BatchGetImage"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "AppRuntimeRepoE01ACDF4",
+         "Arn"
+        ]
+       }
+      },
+      {
+       "Action": "ecr:GetAuthorizationToken",
+       "Effect": "Allow",
+       "Resource": "*"
+      },
+      {
+       "Action": [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "AppRuntimeLogs9E701BA2",
+         "Arn"
+        ]
+       }
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Ref": "AppRuntimeAppEnv759C410D"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "AppRuntimeServiceTaskDefExecutionRoleDefaultPolicy7BD1F848",
+    "Roles": [
+     {
+      "Ref": "AppRuntimeServiceTaskDefExecutionRole345B3A05"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "GrandHealthStack/AppRuntime/Service/TaskDef/ExecutionRole/DefaultPolicy/Resource"
+   }
+  },
+  "AppRuntimeService14F2B184": {
+   "Type": "AWS::ECS::Service",
+   "Properties": {
+    "Cluster": {
+     "Ref": "AppRuntimeClusterE379B5B2"
+    },
+    "DeploymentConfiguration": {
+     "Alarms": {
+      "AlarmNames": [],
+      "Enable": false,
+      "Rollback": false
+     },
+     "DeploymentCircuitBreaker": {
+      "Enable": true,
+      "Rollback": true
+     },
+     "MaximumPercent": 200,
+     "MinimumHealthyPercent": 50
+    },
+    "DeploymentController": {
+     "Type": "ECS"
+    },
+    "DesiredCount": 1,
+    "EnableECSManagedTags": false,
+    "HealthCheckGracePeriodSeconds": 120,
+    "LaunchType": "FARGATE",
+    "LoadBalancers": [
+     {
+      "ContainerName": "web",
+      "ContainerPort": 3000,
+      "TargetGroupArn": {
+       "Ref": "AppRuntimeServiceLBPublicListenerECSGroup4BEF7E2D"
+      }
+     }
+    ],
+    "NetworkConfiguration": {
+     "AwsvpcConfiguration": {
+      "AssignPublicIp": "DISABLED",
+      "SecurityGroups": [
+       {
+        "Fn::GetAtt": [
+         "AppRuntimeServiceSecurityGroupE256CDE4",
+         "GroupId"
+        ]
+       }
+      ],
+      "Subnets": [
+       {
+        "Ref": "VpcprivateSubnet1SubnetCEAD3716"
+       },
+       {
+        "Ref": "VpcprivateSubnet2Subnet2DE7549C"
+       }
+      ]
+     }
+    },
+    "ServiceName": "grand-health-staging-web",
+    "Tags": [
+     {
+      "Key": "PHI",
+      "Value": "true"
+     },
+     {
+      "Key": "Project",
+      "Value": "GrandHealth"
+     },
+     {
+      "Key": "Stage",
+      "Value": "staging"
+     }
+    ],
+    "TaskDefinition": {
+     "Ref": "AppRuntimeServiceTaskDef0C4908FB"
+    }
+   },
+   "DependsOn": [
+    "AppRuntimeServiceLBPublicListenerECSGroup4BEF7E2D",
+    "AppRuntimeServiceLBPublicListener7F2FF880",
+    "AppRuntimeServiceTaskDefTaskRoleE4FC7E65"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "GrandHealthStack/AppRuntime/Service/Service/Service"
+   }
+  },
+  "AppRuntimeServiceSecurityGroupE256CDE4": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "GrandHealthStack/AppRuntime/Service/Service/SecurityGroup",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow all outbound traffic by default",
+      "IpProtocol": "-1"
+     }
+    ],
+    "Tags": [
+     {
+      "Key": "PHI",
+      "Value": "true"
+     },
+     {
+      "Key": "Project",
+      "Value": "GrandHealth"
+     },
+     {
+      "Key": "Stage",
+      "Value": "staging"
+     }
+    ],
+    "VpcId": {
+     "Ref": "Vpc8378EB38"
+    }
+   },
+   "DependsOn": [
+    "AppRuntimeServiceTaskDefTaskRoleE4FC7E65"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "GrandHealthStack/AppRuntime/Service/Service/SecurityGroup/Resource"
+   }
+  },
+  "AppRuntimeServiceSecurityGroupfromGrandHealthStackAppRuntimeServiceLBSecurityGroupC799387B3000CC491C87": {
+   "Type": "AWS::EC2::SecurityGroupIngress",
+   "Properties": {
+    "Description": "Load balancer to target",
+    "FromPort": 3000,
+    "GroupId": {
+     "Fn::GetAtt": [
+      "AppRuntimeServiceSecurityGroupE256CDE4",
+      "GroupId"
+     ]
+    },
+    "IpProtocol": "tcp",
+    "SourceSecurityGroupId": {
+     "Fn::GetAtt": [
+      "AppRuntimeServiceLBSecurityGroupE2AEF7F3",
+      "GroupId"
+     ]
+    },
+    "ToPort": 3000
+   },
+   "DependsOn": [
+    "AppRuntimeServiceTaskDefTaskRoleE4FC7E65"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "GrandHealthStack/AppRuntime/Service/Service/SecurityGroup/from GrandHealthStackAppRuntimeServiceLBSecurityGroupC799387B:3000"
+   }
+  },
   "CustomAWSCDKOpenIdConnectProviderCustomResourceProviderRole517FED65": {
    "Type": "AWS::IAM::Role",
    "Properties": {
@@ -1565,7 +2415,7 @@
   "CDKMetadata": {
    "Type": "AWS::CDK::Metadata",
    "Properties": {
-    "Analytics": "v2:deflate64:H4sIAAAAAAAA/31RTW+cMBD9Lbl73XTVqOcNW0VcGgvSXKvBTKgTsNHMeFcR4r9X4AU2qdTTvC/Zz+O93t9917c3cOadrd92rav0UArYNwVn/j2g3evhubcqe/HPJlMmVq2zZaw8yqRtqAhR8AmqFjd90w7MwToQF/wansCP3EzjJ8gDCJ7hXRlyJxDcDs69IHlcA6nJhR1EwP7p0Isq0UZy8v5AIfZzh/8KuW8ImVXuWcBbTFclPCpGSyjcgYcGSQ/lzC+HTCiNJ6AG5arEGvjsjIpq1sMRBCpgXG9N71wrHu//EbZSDjo9FCFteJmLbSi8uBbVY48+r7PgPVoxFE6uRlImtM7Ou0toVMzd9NPkfGOAoENBmv2FjMqGxjsJevjFSCaEdvJXvICsdZeXf1IWegwdOH8dSMqo0JIeCuwDOwk019vYOKoCOURKf/Oh5GOUPorKIkvorlMb/mAte7gHRnVgRikFGuebUflQo37lL6f9N/31Tt/evLJzO4peXIe6SPMvxmO3qScDAAA="
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/31TXW/bMAz8LX1XtS5bsefU6YoAxWrEXV8LRmY8trZkkHSKwvB/H2THH02HPfHueLZPFL2yq+sf9uoC3uTS5a+XJe1tmym4VwNv8tyiW9n2qXYmOfinNDFpsy/JZc3eo0ZtRrvQKD7CvsRZn7W1SHAESsFP5ghut2ksv0DvQPEN3k3KdATF+cVbr8geJ8OQ5MTWquD+VOjVZOgaJn2/49DUfYb/CltfMIqYrRcF73D41Iw/mG97b2cEHaNKBR4KZNtmPT/ZIxrKI3CBusg2Gc47neFcbLsBhT0ITgGG40/JNzefhNHaGYLKtrswDH6sYzvlcKASzUONfpsnwXt0mnI4Uo5s0lCS60c6oM6IVHEBmHyRAkOFitz3R9IZFwpPGmz7W5DTEMrYn/AIkpJOJz9TRroJFZBfGgalM+jYtjusg5AG7uPNLLbFtknZyCnaCH8CFxD3TV43eCBP47adK8ErkEdeaKdnM+Qjjfffw86UoRDb3odiGv6IO+OQlQ7kQHHaiWTW+nQz7aM/16BxocWu67qMOgV/HyC/gTJeWH4WBUsQJVcGyPe9g3xxXNn230/zkG/Blz4SRX/yjHjRH5ZzOuaCdobjH3v9zbbrHbrA+XApEWWoXWd2KKHhYXQfFueh0bpRkzSioVq6ZvyhNe7mDQiatQhqplCQLzrjQ472Rb4cV9/t12t7dfEiRJfceKUK7W6ofwG5LiHV0gQAAA=="
    },
    "Metadata": {
     "aws:cdk:path": "GrandHealthStack/CDKMetadata/Default"
@@ -1686,6 +2536,40 @@
   "AppRuntimeAppEnvSecretArnFE331FE9": {
    "Value": {
     "Ref": "AppRuntimeAppEnv759C410D"
+   }
+  },
+  "AppRuntimeServiceLoadBalancerDNS50C3F8F0": {
+   "Value": {
+    "Fn::GetAtt": [
+     "AppRuntimeServiceLBF3652A40",
+     "DNSName"
+    ]
+   }
+  },
+  "AppRuntimeServiceServiceURLED157155": {
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      "https://",
+      {
+       "Ref": "AppRuntimeServiceDNSAD686F3C"
+      }
+     ]
+    ]
+   }
+  },
+  "AppRuntimeAlbUrl84D822DF": {
+   "Description": "Staging app URL (HTTPS via custom domain)",
+   "Value": "https://staging.mygrandhealth.com"
+  },
+  "AppRuntimeAlbDnsName0027791C": {
+   "Description": "Raw ALB DNS name (target of the Route 53 alias)",
+   "Value": {
+    "Fn::GetAtt": [
+     "AppRuntimeServiceLBF3652A40",
+     "DNSName"
+    ]
    }
   }
  },

@@ -14,16 +14,18 @@ export default async function ProgramEditPage({ params }: { params: Promise<{ id
   if (!program) notFound();
 
   const [days, sessions] = await Promise.all([
-    withAuth(user, (sql) => sql`SELECT day, session_id FROM program_days WHERE program_id = ${id}`),
+    withAuth(user, (sql) => sql`SELECT id, day, session_id, sort_order FROM program_days WHERE program_id = ${id} AND session_id IS NOT NULL ORDER BY sort_order ASC`),
     withAuth(user, (sql) =>
       sql`SELECT id, kind, name, est_minutes, duration_min, rounds, work_min FROM session_library ORDER BY kind ASC, name ASC`
     ),
   ]);
 
-  const dayMap: Record<string, string | null> = {
-    mon: null, tue: null, wed: null, thu: null, fri: null, sat: null, sun: null,
+  const dayMap: Record<string, { rowId: string; sessionId: string }[]> = {
+    mon: [], tue: [], wed: [], thu: [], fri: [], sat: [], sun: [],
   };
-  days.forEach((d: any) => { dayMap[d.day] = d.session_id ?? null; });
+  days.forEach((d: any) => {
+    if (d.session_id) dayMap[d.day].push({ rowId: d.id, sessionId: d.session_id });
+  });
 
   return (
     <main className="max-w-4xl mx-auto px-6 py-6 space-y-6">

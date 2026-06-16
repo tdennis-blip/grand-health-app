@@ -52,10 +52,10 @@ export default async function PatientTrainingWeek() {
         )}
       </header>
 
-      <section className="space-y-2">
-        {week.map(({ day, session }) => {
+      <section className="space-y-3">
+        {week.map(({ day, sessions }) => {
           const isToday = day === tKey;
-          if (!session) {
+          if (sessions.length === 0) {
             return (
               <div
                 key={day}
@@ -75,30 +75,37 @@ export default async function PatientTrainingWeek() {
               </div>
             );
           }
-          const Icon = KIND_ICON[session.kind];
-          const gradient = session.accent || KIND_TILE[session.kind];
           return (
-            <Link
-              key={day}
-              href={`/home/training/${day}`}
-              className={`block rounded-2xl border p-3 flex items-center gap-3 transition ${
-                isToday ? "bg-white border-teal-300 ring-1 ring-teal-200" : "bg-white border-slate-200 hover:border-teal-300"
-              }`}
-            >
-              <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${gradient} text-white flex items-center justify-center flex-shrink-0`}>
-                <Icon size={18} />
+            <div key={day} className="space-y-1.5">
+              <div className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold px-1">
+                {DAY_SHORT[day]} {isToday && <span className="text-teal-700">· Today</span>}
+                {sessions.length > 1 && <span className="text-slate-400"> · {sessions.length} sessions</span>}
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">
-                  {DAY_SHORT[day]} {isToday && <span className="text-teal-700">· Today</span>}
-                </div>
-                <div className="text-sm font-semibold text-slate-900 truncate">{session.name}</div>
-                <div className="text-[11px] text-slate-500 truncate">
-                  {KIND_LABEL[session.kind]} · {session.focus || `~${session.estMinutes}m`}
-                </div>
-              </div>
-              <ChevronRight size={16} className="text-slate-400 flex-shrink-0" />
-            </Link>
+              {sessions.map((session) => {
+                const Icon = KIND_ICON[session.kind];
+                const gradient = session.accent || KIND_TILE[session.kind];
+                return (
+                  <Link
+                    key={session.id}
+                    href={`/home/training/${day}?s=${session.id}`}
+                    className={`block rounded-2xl border p-3 flex items-center gap-3 transition ${
+                      isToday ? "bg-white border-teal-300 ring-1 ring-teal-200" : "bg-white border-slate-200 hover:border-teal-300"
+                    }`}
+                  >
+                    <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${gradient} text-white flex items-center justify-center flex-shrink-0`}>
+                      <Icon size={18} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold text-slate-900 truncate">{session.name}</div>
+                      <div className="text-[11px] text-slate-500 truncate">
+                        {KIND_LABEL[session.kind]} · {session.focus || `~${session.estMinutes}m`}
+                      </div>
+                    </div>
+                    <ChevronRight size={16} className="text-slate-400 flex-shrink-0" />
+                  </Link>
+                );
+              })}
+            </div>
           );
         })}
       </section>

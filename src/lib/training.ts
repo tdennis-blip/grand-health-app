@@ -55,47 +55,51 @@ export async function getActiveAssignment(): Promise<ActiveAssignment | null> {
   };
 }
 
+export type WeekSessionLite = {
+  id: string;
+  kind: "strength" | "zone2" | "vo2max" | "mobility";
+  name: string;
+  focus: string | null;
+  estMinutes: number;
+  accent: string | null;
+};
+
 export type WeekSession = {
   day: DayKey;
-  session: {
-    id: string;
-    kind: "strength" | "zone2" | "vo2max" | "mobility";
-    name: string;
-    focus: string | null;
-    estMinutes: number;
-    accent: string | null;
-  } | null;
+  // Ordered list of sessions scheduled for the day (empty = rest day).
+  sessions: WeekSessionLite[];
 };
 
 // Returns the 7-day schedule for the patient's active program, in Mon-Sun order.
-// Every day is included; days with no scheduled session have session=null (rest).
+// Every day is included; a day with no scheduled sessions is a rest day.
 export async function getWeekSchedule(programId: string): Promise<WeekSession[]> {
   const user = await getUser();
-  if (!user) return DAY_KEYS.map((day) => ({ day, session: null }));
+  if (!user) return DAY_KEYS.map((day) => ({ day, sessions: [] }));
 
   const rows = await withAuth(user, (sql) =>
     sql`
-      SELECT pd.day, s.id AS session_id, s.kind, s.name, s.focus, s.est_minutes, s.accent
+      SELECT pd.day, pd.sort_order, s.id AS session_id, s.kind, s.name, s.focus, s.est_minutes, s.accent
       FROM program_days pd
       JOIN session_library s ON s.id = pd.session_id
       WHERE pd.program_id = ${programId}
+      ORDER BY pd.sort_order ASC, s.name ASC
     `
   );
 
-  const dayMap: Record<DayKey, WeekSession["session"]> = {
-    mon: null, tue: null, wed: null, thu: null, fri: null, sat: null, sun: null,
+  const dayMap: Record<DayKey, WeekSessionLite[]> = {
+    mon: [], tue: [], wed: [], thu: [], fri: [], sat: [], sun: [],
   };
   rows.forEach((row: any) => {
-    dayMap[row.day as DayKey] = {
+    dayMap[row.day as DayKey].push({
       id: row.session_id,
       kind: row.kind,
       name: row.name,
       focus: row.focus,
       estMinutes: row.est_minutes,
       accent: row.accent,
-    };
+    });
   });
-  return DAY_KEYS.map((day) => ({ day, session: dayMap[day] }));
+  return DAY_KEYS.map((day) => ({ day, sessions: dayMap[day] }));
 }
 
 export type SessionDetail = {
