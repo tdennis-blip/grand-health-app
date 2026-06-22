@@ -65,6 +65,15 @@ export class AppRuntime extends Construct {
     // One JSON secret holds every runtime secret the container needs. Values
     // start as REPLACE_ME placeholders; update them in Secrets Manager with the
     // real connection strings + API keys from your .env.local.
+    //
+    // ⚠️ DO NOT EDIT `secretObjectValue` ON A LIVE ENVIRONMENT. CloudFormation
+    // treats a change to this map as a new desired secret value and OVERWRITES
+    // the whole secret back to these REPLACE_ME placeholders on the next deploy,
+    // wiping DATABASE_URL and every other real value (caused a full staging
+    // outage on 2026-06-22). To expose a NEW env var to the container, add a key
+    // to the `secrets` map below (ecs.Secret.fromSecretsManager) and set its
+    // value directly in Secrets Manager with `put-secret-value` — leave this
+    // block alone.
     this.appEnvSecret = new secretsmanager.Secret(this, "AppEnv", {
       secretName: `grand-health/${stage}/app-env`,
       secretObjectValue: {

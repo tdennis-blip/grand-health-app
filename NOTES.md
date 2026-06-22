@@ -42,6 +42,18 @@ Remaining: browser smoke test — clinician program → strength session with ex
 
 ---
 
+## ⚠️ GOTCHA: never edit `secretObjectValue` in infra/lib/app-runtime.ts on a live env
+
+2026-06-22 staging outage: adding keys to the `secretObjectValue` map (to wire Oura) changed that CFN property, so the next `cdk deploy` **overwrote the entire `grand-health/staging/app-env` secret back to REPLACE_ME defaults** — wiping DATABASE_URL etc. Symptom: every page 500s with `TypeError: Invalid URL, input: 'REPLACE_ME'` (postgres-js can't parse "REPLACE_ME"). Fix used: restore the prior secret version + roll the service:
+```bash
+PREV=$(aws secretsmanager get-secret-value --secret-id grand-health/staging/app-env --version-stage AWSPREVIOUS --query SecretString --output text)
+aws secretsmanager put-secret-value --secret-id grand-health/staging/app-env --secret-string "$PREV"
+aws ecs update-service --cluster grand-health-staging --service grand-health-staging-web --force-new-deployment
+```
+To add a new container env var: add ONLY to the `secrets` map (`ecs.Secret.fromSecretsManager(...)`) and set the value via `put-secret-value`. Do NOT touch `secretObjectValue`.
+
+---
+
 ## 📋 Session log 2026-06-22 — Oura ring: wiring secrets to go live
 
 Oura code was already complete (client, OAuth start/callback, webhook, registry, integrations tile). Gap: the three `OURA_*` env vars were never injected into the running container — the ECS task def in `infra/lib/app-runtime.ts` enumerates each secret key explicitly. **Added `OURA_CLIENT_ID` / `OURA_CLIENT_SECRET` / `OURA_WEBHOOK_SECRET`** to both the `secretObjectValue` defaults and the `secrets` (ecs.Secret.fromSecretsManager) map. CI/CD (`deploy.yml`) just describes the existing task def + swaps the image, so the CDK-defined secrets carry forward — only a `cdk deploy` adds them.
