@@ -1026,6 +1026,8 @@ export const wearableDailyMetrics = pgTable(
     activityScore: integer("activity_score"),
     activeKcal: integer("active_kcal"),
     totalKcal: integer("total_kcal"),
+    bedtimeStart: text("bedtime_start"),
+    bedtimeEnd: text("bedtime_end"),
     raw: jsonb("raw"),
     fetchedAt: timestamp("fetched_at", { withTimezone: true }).defaultNow().notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

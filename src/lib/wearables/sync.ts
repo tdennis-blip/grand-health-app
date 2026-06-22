@@ -193,6 +193,8 @@ export async function upsertDailyMetrics(
     activity_score:       m.activityScore ?? null,
     active_kcal:          m.activeKcal ?? null,
     total_kcal:           m.totalKcal ?? null,
+    bedtime_start:        m.bedtimeStart ?? null,
+    bedtime_end:          m.bedtimeEnd ?? null,
     raw:                  m.raw ?? null,
     fetched_at:           new Date().toISOString(),
   }));
@@ -211,6 +213,8 @@ export async function upsertDailyMetrics(
       activity_score       = EXCLUDED.activity_score,
       active_kcal          = EXCLUDED.active_kcal,
       total_kcal           = EXCLUDED.total_kcal,
+      bedtime_start        = EXCLUDED.bedtime_start,
+      bedtime_end          = EXCLUDED.bedtime_end,
       raw                  = EXCLUDED.raw,
       fetched_at           = EXCLUDED.fetched_at
   `;

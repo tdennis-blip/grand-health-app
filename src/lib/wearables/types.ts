@@ -19,6 +19,8 @@ export type DailyMetric = {
   activityScore?: number | null;
   activeKcal?: number | null;   // exercise/movement calories
   totalKcal?: number | null;    // active + resting (provider total)
+  bedtimeStart?: string | null; // ISO w/ offset — went to bed
+  bedtimeEnd?: string | null;   // ISO w/ offset — woke up
   raw: unknown;
 };
 

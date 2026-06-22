@@ -42,6 +42,22 @@ Remaining: browser smoke test — clinician program → strength session with ex
 
 ---
 
+## 📋 Session log 2026-06-22 — Oura: calories-burned card + bedtime/wake (built, NOT yet shipped)
+
+- **Migration 0021** (`0021_wearable_bedtime.sql`): `wearable_daily_metrics.bedtime_start` + `bedtime_end` (text, ISO with device UTC offset).
+- **Oura sleep fetch**: `SleepRowSchema` + DailyMetric + sync upsert + `schema.ts` now carry `bedtime_start/end` (from the primary long_sleep row). Whoop leaves them null.
+- **Sleep page** (`/home/sleep`): "Last night" hero shows **To bed / Woke up** times via new `formatClockTime()` in `queries.ts` (reads HH:MM off the ISO string so it shows the device's local clock, no tz math).
+- **Calories burned today card** on the **Today home page** (under the What-to-do grid), only when a device measured `active_kcal`. New `getActiveKcalToday()` in `queries.ts`. Card links to /home/diet and notes it feeds the daily goal (which it does in dynamic-mode plans via the 0020 work).
+
+**⚠️ Migrations 0020 AND 0021 must both be run on staging** (the secret-overwrite outage interrupted things — 0020 may still be unrun). Run in order via the bastion tunnel + `DIRECT_DATABASE_URL`:
+```bash
+psql "$DIRECT_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/0020_activity_aware_calories.sql
+psql "$DIRECT_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/0021_wearable_bedtime.sql
+```
+Without them, the Oura backfill/sync upsert (which writes active_kcal/total_kcal/bedtime_*) will fail.
+
+---
+
 ## ⚠️ GOTCHA: never edit `secretObjectValue` in infra/lib/app-runtime.ts on a live env
 
 2026-06-22 staging outage: adding keys to the `secretObjectValue` map (to wire Oura) changed that CFN property, so the next `cdk deploy` **overwrote the entire `grand-health/staging/app-env` secret back to REPLACE_ME defaults** — wiping DATABASE_URL etc. Symptom: every page 500s with `TypeError: Invalid URL, input: 'REPLACE_ME'` (postgres-js can't parse "REPLACE_ME"). Fix used: restore the prior secret version + roll the service:

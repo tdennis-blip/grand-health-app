@@ -131,6 +131,8 @@ const SleepRowSchema = z.object({
   efficiency: z.number().nullable().optional(),           // 0-100
   average_hrv: z.number().nullable().optional(),          // ms
   lowest_heart_rate: z.number().nullable().optional(),
+  bedtime_start: z.string().nullable().optional(),        // ISO w/ offset
+  bedtime_end: z.string().nullable().optional(),          // ISO w/ offset
 }).passthrough();
 
 const ReadinessRowSchema = z.object({
@@ -189,49 +191,42 @@ async function fetchDailyRange(opts: {
     sleepEfficiency: number | null;
     hrv: number | null;
     restingHr: number | null;
+    bedtimeStart: string | null;
+    bedtimeEnd: string | null;
     raw: { sleep: unknown[]; readiness?: unknown; activity?: unknown };
   };
+  const newBucket = (day: string): Bucket => ({
+    day,
+    sleepMinutes: 0,
+    sleepEfficiency: null,
+    hrv: null,
+    restingHr: null,
+    bedtimeStart: null,
+    bedtimeEnd: null,
+    raw: { sleep: [] as unknown[] },
+  });
   const byDay = new Map<string, Bucket>();
   for (const s of sleep) {
-    const b = byDay.get(s.day) ?? {
-      day: s.day,
-      sleepMinutes: 0,
-      sleepEfficiency: null,
-      hrv: null,
-      restingHr: null,
-      raw: { sleep: [] as unknown[] },
-    };
+    const b = byDay.get(s.day) ?? newBucket(s.day);
     b.sleepMinutes += Math.round((s.total_sleep_duration ?? 0) / 60);
     const isPrimary = s.type === "long_sleep" || b.sleepEfficiency == null;
     if (isPrimary) {
       b.sleepEfficiency = s.efficiency ?? b.sleepEfficiency;
       b.hrv = s.average_hrv ?? b.hrv;
       b.restingHr = s.lowest_heart_rate ?? b.restingHr;
+      b.bedtimeStart = s.bedtime_start ?? b.bedtimeStart;
+      b.bedtimeEnd = s.bedtime_end ?? b.bedtimeEnd;
     }
     b.raw.sleep.push(s);
     byDay.set(s.day, b);
   }
   for (const r of readiness) {
-    const b = byDay.get(r.day) ?? {
-      day: r.day,
-      sleepMinutes: 0,
-      sleepEfficiency: null,
-      hrv: null,
-      restingHr: null,
-      raw: { sleep: [] as unknown[] },
-    };
+    const b = byDay.get(r.day) ?? newBucket(r.day);
     b.raw.readiness = r;
     byDay.set(r.day, b);
   }
   for (const a of activity) {
-    const b = byDay.get(a.day) ?? {
-      day: a.day,
-      sleepMinutes: 0,
-      sleepEfficiency: null,
-      hrv: null,
-      restingHr: null,
-      raw: { sleep: [] as unknown[] },
-    };
+    const b = byDay.get(a.day) ?? newBucket(a.day);
     b.raw.activity = a;
     byDay.set(a.day, b);
   }
@@ -254,6 +249,8 @@ async function fetchDailyRange(opts: {
     activityScore: activityByDay.get(b.day) ?? null,
     activeKcal: activeKcalByDay.get(b.day) ?? null,
     totalKcal: totalKcalByDay.get(b.day) ?? null,
+    bedtimeStart: b.bedtimeStart,
+    bedtimeEnd: b.bedtimeEnd,
     raw: b.raw,
   }));
 }

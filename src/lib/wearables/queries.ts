@@ -16,6 +16,9 @@ export type DailyMetricRow = {
   readiness_score: number | null;
   strain_score: number | null;
   activity_score: number | null;
+  active_kcal: number | null;
+  bedtime_start: string | null;
+  bedtime_end: string | null;
 };
 
 /** Most recent N days of metrics for a patient. */
@@ -31,7 +34,8 @@ export async function getRecentMetrics(
     SELECT metric_date, provider,
            sleep_total_minutes, sleep_efficiency_pct, sleep_score,
            hrv_rmssd_ms, resting_hr_bpm, recovery_score,
-           readiness_score, strain_score, activity_score
+           readiness_score, strain_score, activity_score,
+           active_kcal, bedtime_start, bedtime_end
     FROM wearable_daily_metrics
     WHERE patient_id = ${patientId}
       AND metric_date >= ${sinceIso}
@@ -48,13 +52,35 @@ export async function getLatestMetric(
     SELECT metric_date, provider,
            sleep_total_minutes, sleep_efficiency_pct, sleep_score,
            hrv_rmssd_ms, resting_hr_bpm, recovery_score,
-           readiness_score, strain_score, activity_score
+           readiness_score, strain_score, activity_score,
+           active_kcal, bedtime_start, bedtime_end
     FROM wearable_daily_metrics
     WHERE patient_id = ${patientId}
     ORDER BY metric_date DESC
     LIMIT 1
   `;
   return row ?? null;
+}
+
+/**
+ * Today's device-measured active calories (movement/exercise burn), if any
+ * connected wearable reported them. Used by the Today page's "Calories burned"
+ * card — returns null when no device measured it.
+ */
+export async function getActiveKcalToday(
+  patientId: string
+): Promise<{ kcal: number; provider: WearableProvider } | null> {
+  const todayIso = isoDate(new Date());
+  const [row] = await serviceRoleSql<Array<{ active_kcal: number; provider: WearableProvider }>>`
+    SELECT active_kcal, provider
+    FROM wearable_daily_metrics
+    WHERE patient_id = ${patientId}
+      AND metric_date = ${todayIso}
+      AND active_kcal IS NOT NULL
+    ORDER BY active_kcal DESC
+    LIMIT 1
+  `;
+  return row ? { kcal: Number(row.active_kcal), provider: row.provider } : null;
 }
 
 /** Has the patient connected anything? */
@@ -72,6 +98,21 @@ export async function hasAnyConnection(patientId: string): Promise<boolean> {
 // ---------------------------------------------------------------------------
 // Formatting helpers shared by the cards.
 // ---------------------------------------------------------------------------
+
+// Format a wearable bedtime/wake ISO string (with embedded UTC offset) into a
+// local clock time like "11:14 PM" — reading the HH:MM directly off the string
+// so we show the device's local time, not the server's timezone.
+export function formatClockTime(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const m = iso.match(/T(\d{2}):(\d{2})/);
+  if (!m) return null;
+  let h = parseInt(m[1], 10);
+  const min = m[2];
+  const ampm = h >= 12 ? "PM" : "AM";
+  h = h % 12;
+  if (h === 0) h = 12;
+  return `${h}:${min} ${ampm}`;
+}
 
 export function formatSleepDuration(minutes: number | null | undefined): string | null {
   if (minutes == null || minutes <= 0) return null;
@@ -103,6 +144,8 @@ export type SleepNight = {
   hrvMs: number | null;
   restingHrBpm: number | null;
   recoveryScore: number | null;
+  bedtimeStart: string | null;
+  bedtimeEnd: string | null;
   provider: WearableProvider | null;
 };
 
@@ -169,6 +212,8 @@ export async function getSleepSummary(
       hrvMs: r?.hrv_rmssd_ms != null ? Number(r.hrv_rmssd_ms) : null,
       restingHrBpm: r?.resting_hr_bpm != null ? Number(r.resting_hr_bpm) : null,
       recoveryScore: r?.recovery_score ?? r?.readiness_score ?? null,
+      bedtimeStart: r?.bedtime_start ?? null,
+      bedtimeEnd: r?.bedtime_end ?? null,
       provider: (r?.provider as WearableProvider | undefined) ?? null,
     });
   }

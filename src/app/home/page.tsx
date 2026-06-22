@@ -16,6 +16,7 @@ import {
   CalendarDays,
   ChevronRight,
   Dumbbell,
+  Flame,
   MessageSquare,
   Moon,
   Pill,
@@ -28,10 +29,11 @@ import { ProgressRing } from "@/components/progress-ring";
 import { getTodayScore, scoreColor, type DomainScore } from "@/lib/today-score";
 import { getDosesForDate, isoDate as isoDateMed } from "@/lib/medications";
 import { getNextAppointmentWithPrep, apptTypeLabel } from "@/lib/appointments";
+import { getActiveKcalToday, prettyProvider } from "@/lib/wearables/queries";
 
 export default async function PatientHome() {
   const user = await requirePatient();
-  const [[profile], score, [todayDoses, nextAppt]] = await Promise.all([
+  const [[profile], score, [todayDoses, nextAppt], activeKcalToday] = await Promise.all([
     withAuth(user, (sql) =>
       sql`SELECT first_name FROM profiles WHERE id = ${user.id} LIMIT 1`
     ),
@@ -40,6 +42,7 @@ export default async function PatientHome() {
       getDosesForDate(user.id, isoDateMed(new Date()), user),
       getNextAppointmentWithPrep(user.id, user),
     ]),
+    getActiveKcalToday(user.id),
   ]);
 
   const takenToday = todayDoses.filter((d) => d.taken).length;
@@ -132,6 +135,28 @@ export default async function PatientHome() {
           <AppointmentCard appt={nextAppt} />
         </div>
       </div>
+
+      {activeKcalToday && (
+        <Link
+          href="/home/diet"
+          className="block bg-gradient-to-br from-orange-500 to-rose-500 text-white rounded-2xl p-4 hover:shadow-lg transition"
+        >
+          <div className="flex items-center justify-between">
+            <div className="text-[10px] uppercase tracking-wide opacity-90 flex items-center gap-1">
+              <Flame size={12} /> Calories burned today
+            </div>
+            <span className="text-[9px] uppercase tracking-wide opacity-80 bg-white/15 rounded-full px-1.5 py-0.5">
+              {prettyProvider(activeKcalToday.provider)}
+            </span>
+          </div>
+          <div className="text-3xl font-semibold tabular-nums mt-1">
+            {activeKcalToday.kcal.toLocaleString()} <span className="text-base font-normal opacity-90">kcal</span>
+          </div>
+          <div className="text-[11px] opacity-90 mt-1">
+            Active calories from your device · feeds your daily calorie goal
+          </div>
+        </Link>
+      )}
 
       {latestClinicianMsg && (
         <Link

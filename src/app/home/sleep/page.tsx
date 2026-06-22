@@ -25,6 +25,7 @@ import { withAuth } from "@/lib/db/connection";
 import {
   getSleepSummary,
   formatSleepDuration,
+  formatClockTime,
   hasAnyConnection,
   prettyProvider,
   type SleepNight,
@@ -207,6 +208,20 @@ function LastNightHero({
           <span>10h</span>
         </div>
       </div>
+
+      {(night.bedtimeStart || night.bedtimeEnd) && (
+        <div className="mt-3 flex items-center justify-between bg-white/10 rounded-lg px-3 py-2">
+          <div>
+            <div className="text-[9px] uppercase tracking-wide opacity-80">To bed</div>
+            <div className="text-[14px] font-semibold tabular-nums">{formatClockTime(night.bedtimeStart) ?? "—"}</div>
+          </div>
+          <Moon size={14} className="opacity-70" />
+          <div className="text-right">
+            <div className="text-[9px] uppercase tracking-wide opacity-80">Woke up</div>
+            <div className="text-[14px] font-semibold tabular-nums">{formatClockTime(night.bedtimeEnd) ?? "—"}</div>
+          </div>
+        </div>
+      )}
 
       <div className="mt-3 grid grid-cols-3 gap-1.5 text-center">
         <HeroStat
