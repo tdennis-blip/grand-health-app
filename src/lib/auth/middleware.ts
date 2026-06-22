@@ -52,7 +52,10 @@ export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   const isAuthPage = pathname.startsWith("/login") || pathname.startsWith("/auth/");
-  const isPublic = pathname === "/" || isAuthPage;
+  // Public legal pages — must be viewable without login (e.g. for Oura/Whoop
+  // app review and the OAuth consent footer links).
+  const isLegalPage = pathname === "/privacy" || pathname === "/terms";
+  const isPublic = pathname === "/" || isAuthPage || isLegalPage;
 
   const idToken = getIdTokenFromRequest(request);
 
