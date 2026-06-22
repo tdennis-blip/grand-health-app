@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect, useRef } from "react";
 import { Check, Pencil, X } from "lucide-react";
 import { updateMyProfile } from "./actions";
 
@@ -249,21 +249,7 @@ export function ProfileEditor({ initial }: { initial: ProfileInitial }) {
       <div>
         <span className="text-[11px] uppercase tracking-wide text-slate-500 font-medium">Weight</span>
         <div className="mt-1">
-          {units === "metric" ? (
-            <NumInput
-              value={weightKg}
-              onChange={(v) => setWeightKg(v)}
-              suffix="kg"
-              placeholder="75"
-            />
-          ) : (
-            <NumInput
-              value={weightLb}
-              onChange={(v) => setWeightKg(lbToKg(v))}
-              suffix="lb"
-              placeholder="165"
-            />
-          )}
+          <WeightInput weightKg={weightKg} units={units} onChangeKg={setWeightKg} />
         </div>
       </div>
 
@@ -350,6 +336,57 @@ function NumInput({
       />
       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] uppercase tracking-wide text-slate-400 pointer-events-none">
         {suffix}
+      </span>
+    </div>
+  );
+}
+
+// Weight needs its own input because the canonical value is kg but the user
+// may type in lb. Deriving the displayed lb from kg on every keystroke caused
+// a lossy lb→kg→lb round-trip that rewrote what was typed (you couldn't reach
+// 3-digit numbers). Here we keep the typed text verbatim and only resync the
+// display from the canonical value on non-typing changes (load, cancel, unit
+// toggle).
+function WeightInput({
+  weightKg,
+  units,
+  onChangeKg,
+}: {
+  weightKg: number | null;
+  units: "metric" | "imperial";
+  onChangeKg: (kg: number | null) => void;
+}) {
+  const toDisplay = (kg: number | null) =>
+    kg == null ? "" : String(units === "imperial" ? kgToLb(kg) : kg);
+
+  const [text, setText] = useState<string>(() => toDisplay(weightKg));
+  const typingRef = useRef(false);
+
+  // Resync from the canonical value unless the change came from our own typing.
+  useEffect(() => {
+    if (!typingRef.current) setText(toDisplay(weightKg));
+    typingRef.current = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weightKg, units]);
+
+  return (
+    <div className="relative">
+      <input
+        type="number"
+        value={text}
+        onChange={(e) => {
+          const raw = e.target.value;
+          setText(raw);
+          typingRef.current = true;
+          if (raw === "") return onChangeKg(null);
+          const n = Math.max(0, Math.floor(Number(raw) || 0));
+          onChangeKg(units === "imperial" ? lbToKg(n) : n);
+        }}
+        placeholder={units === "imperial" ? "165" : "75"}
+        className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:border-teal-500 tabular-nums"
+      />
+      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] uppercase tracking-wide text-slate-400 pointer-events-none">
+        {units === "imperial" ? "lb" : "kg"}
       </span>
     </div>
   );
