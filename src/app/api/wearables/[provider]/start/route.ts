@@ -43,8 +43,14 @@ export async function GET(
 }
 
 function buildRedirectUri(req: NextRequest, provider: WearableProvider): string {
-  const base =
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
-    new URL(req.url).origin;
+  const configured = process.env.NEXT_PUBLIC_SITE_URL;
+  let base: string;
+  if (configured && /^https?:\/\//.test(configured) && !configured.includes("PLACEHOLDER")) {
+    base = configured.replace(/\/$/, "");
+  } else {
+    const fwdHost = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+    const fwdProto = req.headers.get("x-forwarded-proto") ?? "https";
+    base = fwdHost ? `${fwdProto}://${fwdHost}` : new URL(req.url).origin;
+  }
   return `${base}/api/wearables/${provider}/callback`;
 }

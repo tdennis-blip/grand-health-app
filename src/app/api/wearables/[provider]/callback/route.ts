@@ -46,7 +46,7 @@ export async function GET(
   }
 
   const user = await getUser();
-  if (!user) return NextResponse.redirect(new URL("/login", req.url));
+  if (!user) return NextResponse.redirect(new URL("/login", siteBase(req)));
   if (user.role !== "patient") return redirectToIntegrations(req, { error: "not_patient" });
 
   const redirectUri = buildRedirectUri(req, providerKey);
@@ -97,15 +97,26 @@ async function backfill(connectionId: string, provider: WearableProvider) {
   void provider;
 }
 
+// Public base URL of the app. Prefer the configured site URL — behind the ALB
+// `req.url` resolves to the task's internal hostname (ip-10-0-x-x.ec2.internal),
+// which would 302 the browser to an unreachable host.
+function siteBase(req: NextRequest): string {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL;
+  if (configured && /^https?:\/\//.test(configured) && !configured.includes("PLACEHOLDER")) {
+    return configured.replace(/\/$/, "");
+  }
+  const fwdHost = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+  const fwdProto = req.headers.get("x-forwarded-proto") ?? "https";
+  if (fwdHost) return `${fwdProto}://${fwdHost}`;
+  return new URL(req.url).origin;
+}
+
 function buildRedirectUri(req: NextRequest, provider: WearableProvider): string {
-  const base =
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
-    new URL(req.url).origin;
-  return `${base}/api/wearables/${provider}/callback`;
+  return `${siteBase(req)}/api/wearables/${provider}/callback`;
 }
 
 function redirectToIntegrations(req: NextRequest, params: Record<string, string>) {
-  const u = new URL("/home/profile/integrations", req.url);
+  const u = new URL("/home/profile/integrations", siteBase(req));
   for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
   return NextResponse.redirect(u);
 }
