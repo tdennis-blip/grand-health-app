@@ -12,13 +12,33 @@ Living orientation doc for the production app. **Read this first** when picking 
 - **RDS endpoint:** `grandhealthstack-postgres9dc8bb04-1ez67niaci4f.ce1muwi8yqjt.us-east-1.rds.amazonaws.com`
 - **DNS:** `mygrandhealth.com` is on **Squarespace**. The `staging` subdomain is delegated to Route 53 via four `NS` records (Host `staging`) pointing at: ns-1533.awsdns-63.org, ns-1833.awsdns-37.co.uk, ns-247.awsdns-30.com, ns-606.awsdns-11.net. ACM cert auto-validates through that delegated zone.
 - **CI/CD live:** push to `main` → GitHub Actions builds image → ECR → rolls the ECS service (`.github/workflows/deploy.yml`). GitHub repo has secret `AWS_DEPLOY_ROLE_ARN` + var `NEXT_PUBLIC_SITE_URL=https://staging.mygrandhealth.com`.
-- **Secret `grand-health/staging/app-env`:** real `DATABASE_URL`/`SERVICE_ROLE_DATABASE_URL` (RDS endpoint, sslmode=require), `USDA_API_KEY=DEMO_KEY`, Cloudinary name+key. **Still `REPLACE_ME`:** `ANTHROPIC_API_KEY` (chat) + `CLOUDINARY_API_SECRET` (image upload) — fill via `put-secret-value` then `aws ecs update-service --cluster grand-health-staging --service grand-health-staging-web --force-new-deployment`.
-- **Test users:** created via `scripts/create-test-user.sh` (Cognito) + manual `profiles`/`*_profiles` insert over the bastion tunnel (script prints the SQL when `DIRECT_DATABASE_URL` is unset). Clinician `nurse@grandhealth.local` exists.
+- **Secret `grand-health/staging/app-env`:** real `DATABASE_URL`/`SERVICE_ROLE_DATABASE_URL` (RDS endpoint, sslmode=require), `USDA_API_KEY=DEMO_KEY`, Cloudinary name+key+**secret (set)**. **Still `REPLACE_ME`: `ANTHROPIC_API_KEY`** (diet AI plan generator) — fill via `put-secret-value` (read-modify-write with jq) then `aws ecs update-service --cluster grand-health-staging --service grand-health-staging-web --force-new-deployment`.
+- **Test users (password `Grand1230!`):** clinician `nurse@grandhealth.local` (Dana Lopez), patient `patient1@grandhealth.local` (Sam Okafor). Created via `scripts/create-test-user.sh` + profile insert over the bastion tunnel.
+- **Bastion tunnel** (for psql/migrations against private RDS): `aws ssm start-session --target i-0545839633bb8fc95 --document-name AWS-StartPortForwardingSessionToRemoteHost --parameters '{"host":["<RDS endpoint above>"],"portNumber":["5432"],"localPortNumber":["5432"]}'` then `export DIRECT_DATABASE_URL="postgresql://grandhealth:<pw>@localhost:5432/grandhealth?sslmode=require"`. **It keeps dropping** because the repo lives in an **iCloud** folder — see "move to ~/dev" below.
 - **Redeploy with domain (idempotent):** `cd infra && npx cdk deploy -c stage=staging -c withService=true -c domain=staging.mygrandhealth.com -c hostedZone=staging.mygrandhealth.com`.
 
-**Remaining (optional):** fill the two `REPLACE_ME` secrets (Anthropic, Cloudinary secret); add a patient test user; run `docs/staging-smoke-test.md`.
-
 Full ordered runbook: `docs/deploy-staging-runbook.md`.
+
+---
+
+## 📋 Session log 2026-06-16 — feature work after go-live
+
+**Shipped & deployed (migrations run on staging):**
+- **Training 404 fix** — patient training-day deep link now shows a friendly "no program yet" empty state instead of 404 (`home/training/[day]/page.tsx`).
+- **HR zones gap** — migration 0004 seeds zones only for clinics existing at migrate-time; staging clinic was created after, so zones were empty. Backfilled via new `supabase/snippets/seed_hr_zones.sql` (run on staging). Clinician Zones & targets editor now populated.
+- **VO₂ max minutes** — session editor now shows **work-only minutes** (rounds×work) separate from **total session time** (warm-up + rounds×(work+recovery) + cool-down); auto-calc + save now use sensible defaults so values never persist as null/zero. Weekly summary "VO₂ max work" fixed. (Optional stored-data backfill SQL for old null vo2 sessions was offered — `UPDATE session_library ... WHERE kind='vo2max'`; unclear if run.)
+- **Multiple sessions per day** — **migration 0018** (`program_days` got `id` PK + `sort_order`, dropped one-per-day PK, cleared null placeholder rows) — RUN on staging. Clinician program editor: each day has "+ Add session…", reorder ↑/↓, remove ×. Patient week view lists multiple per day; day detail shows a chooser (`?s=<id>`) when >1. Reads return `sessions[]` (`lib/training.ts`, `today-score.ts`).
+- **Diet AI guardrails** — `home/diet/ai-plan-actions.ts` now sends a `system` prompt (stay on meal planning, no medical/diagnosis advice, ignore note-based prompt injection, no disordered-eating) + caps patient free-text note at 500 chars. Model stays Haiku. (One-shot diet plan generator is the ONLY Anthropic usage — not an open chatbot.)
+- **Cloudinary secret** set in Secrets Manager (image/video uploads).
+
+**✅ SHIPPED 2026-06-22 — workout logging:**
+Per-set actual logging (clinician prescribes reps/weight; patient logs what they actually did; clinician sees it). Commit `04ae58a` pushed to `main` (CI/CD deployed) **and migration 0019 applied + verified on staging** (`exercise_set_logs` table + both RLS policies confirmed via `\d`). Tunnel/psql tip that worked: pull the URL from Secrets Manager and rewrite host to localhost — `export DIRECT_DATABASE_URL="$(aws secretsmanager get-secret-value --secret-id grand-health/staging/app-env --query SecretString --output text | python3 -c 'import sys,json,re; print(re.sub(r"@[^/]+/","@localhost:5432/",json.load(sys.stdin)["DATABASE_URL"]))')"`.
+Remaining: browser smoke test — clinician program → strength session with exercises+sets → assign to patient1 → patient1 opens that day, edits reps/weight per set (autosaves) + Done check → clinician patient page → "View logged workouts →" link shows actual vs prescribed.
+   - Files: `migrations/0019_*`, `schema.ts` (`exerciseSetLogs`), `lib/training.ts` (`getSetLogsForSession`), `home/training/[day]/{set-logger.tsx,log-actions.ts}` + page wiring, `clinician/patient/[id]/workouts/page.tsx` + link in `program-assignments.tsx`.
+
+**Other open items:** fill `ANTHROPIC_API_KEY` to enable the diet AI generator; consider wiring the weekly VO₂ target to tally work-only minutes; run `add_missing_pillars.sql` / `seed_interactions.sql` snippets over the tunnel if those per-clinic tables are empty on staging; run `docs/staging-smoke-test.md`.
+
+**🛠 Recommended: move the repo out of iCloud** (`~/Desktop/AI Projects/.../grand-health-app` → e.g. `~/dev/grand-health-app`). iCloud sync caused repeated `.git/index.lock` / `HEAD.lock` errors and the SSM tunnel/psql friction all session. Moving it fixes both.
 
 ---
 
