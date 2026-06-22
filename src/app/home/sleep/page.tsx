@@ -15,7 +15,6 @@ import {
   Moon,
   HeartPulse,
   Activity,
-  Gauge,
   Plug,
   Sparkles,
   ChevronRight,
@@ -151,13 +150,6 @@ function LastNightHero({
 }) {
   const dur = night.durationMin ?? 0;
   const pct = Math.min(1, dur / goalMin);
-  // Heuristic "headline" score: average of the things we have.
-  const parts: number[] = [];
-  if (night.durationMin != null) parts.push(Math.min(1, night.durationMin / goalMin) * 100);
-  if (night.efficiencyPct != null) parts.push(Math.min(100, night.efficiencyPct));
-  if (night.recoveryScore != null) parts.push(Math.min(100, night.recoveryScore));
-  const headline = parts.length > 0 ? Math.round(parts.reduce((a, b) => a + b, 0) / parts.length) : null;
-
   const meets = night.durationMin != null && night.durationMin >= goalMin;
   const dateLabel = formatDateLabel(night.date);
 
@@ -185,10 +177,10 @@ function LastNightHero({
               : "Duration not reported"}
           </div>
         </div>
-        {headline != null && (
+        {night.sleepScore != null && (
           <div className="ml-auto text-right">
-            <div className="text-[10px] uppercase tracking-wide opacity-80">Score</div>
-            <div className="text-2xl font-semibold tabular-nums leading-none">{headline}</div>
+            <div className="text-[10px] uppercase tracking-wide opacity-80">Sleep score</div>
+            <div className="text-2xl font-semibold tabular-nums leading-none">{Math.round(night.sleepScore)}</div>
             <div className="text-[10px] opacity-75">/ 100</div>
           </div>
         )}
@@ -225,9 +217,9 @@ function LastNightHero({
 
       <div className="mt-3 grid grid-cols-3 gap-1.5 text-center">
         <HeroStat
-          icon={<Gauge size={11} />}
-          label="Efficiency"
-          value={night.efficiencyPct != null ? `${Math.round(night.efficiencyPct)}%` : "—"}
+          icon={<Moon size={11} />}
+          label="Sleep time"
+          value={formatSleepDuration(night.durationMin) ?? "—"}
         />
         <HeroStat
           icon={<HeartPulse size={11} />}
@@ -236,8 +228,8 @@ function LastNightHero({
         />
         <HeroStat
           icon={<Activity size={11} />}
-          label="Recovery"
-          value={night.recoveryScore != null ? String(Math.round(night.recoveryScore)) : "—"}
+          label="Sleep score"
+          value={night.sleepScore != null ? String(Math.round(night.sleepScore)) : "—"}
         />
       </div>
     </div>
@@ -433,32 +425,22 @@ function ThirtyDayTrends({ nights }: { nights: SleepNight[] }) {
         yMax={10 * 60}
       />
       <TrendLine
-        title="Efficiency"
-        values={nights.map((n) => n.efficiencyPct)}
-        unit="%"
-        formatter={(v) => `${Math.round(v)}%`}
-        color="#10b981"
-        bgColor="#d1fae5"
-        yMin={50}
-        yMax={100}
-      />
-      <TrendLine
-        title="Recovery"
-        values={nights.map((n) => n.recoveryScore)}
-        unit=""
-        formatter={(v) => `${Math.round(v)}`}
-        color="#8b5cf6"
-        bgColor="#ede9fe"
-        yMin={0}
-        yMax={100}
-      />
-      <TrendLine
         title="HRV"
         values={nights.map((n) => n.hrvMs)}
         unit="ms"
         formatter={(v) => `${Math.round(v)}ms`}
         color="#f43f5e"
         bgColor="#ffe4e6"
+      />
+      <TrendLine
+        title="Sleep score"
+        values={nights.map((n) => n.sleepScore)}
+        unit=""
+        formatter={(v) => `${Math.round(v)}`}
+        color="#8b5cf6"
+        bgColor="#ede9fe"
+        yMin={0}
+        yMax={100}
       />
     </div>
   );
