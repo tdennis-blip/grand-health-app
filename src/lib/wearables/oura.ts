@@ -140,6 +140,13 @@ const ReadinessRowSchema = z.object({
   score: z.number().nullable().optional(),
 }).passthrough();
 
+// daily_sleep holds Oura's 0-100 nightly sleep score (separate from the
+// detailed `sleep` periods which carry duration/efficiency/HRV).
+const DailySleepRowSchema = z.object({
+  day: z.string(),
+  score: z.number().nullable().optional(),
+}).passthrough();
+
 const ActivityRowSchema = z.object({
   day: z.string(),
   score: z.number().nullable().optional(),
@@ -176,10 +183,11 @@ async function fetchDailyRange(opts: {
   endDate: string;
 }): Promise<DailyMetric[]> {
   const params = { start_date: opts.startDate, end_date: opts.endDate };
-  const [sleep, readiness, activity] = await Promise.all([
+  const [sleep, readiness, activity, dailySleep] = await Promise.all([
     ouraGet(opts.accessToken, "sleep", params, SleepRowSchema),
     ouraGet(opts.accessToken, "daily_readiness", params, ReadinessRowSchema),
     ouraGet(opts.accessToken, "daily_activity", params, ActivityRowSchema),
+    ouraGet(opts.accessToken, "daily_sleep", params, DailySleepRowSchema),
   ]);
 
   // Merge by day. Multiple sleep rows per day (e.g. nap + long sleep) get
@@ -231,16 +239,22 @@ async function fetchDailyRange(opts: {
     byDay.set(a.day, b);
   }
 
+  // Ensure days that only have a daily_sleep score still produce a row.
+  for (const d of dailySleep) {
+    if (!byDay.has(d.day)) byDay.set(d.day, newBucket(d.day));
+  }
+
   const readinessByDay = new Map(readiness.map((r) => [r.day, r.score ?? null]));
   const activityByDay = new Map(activity.map((a) => [a.day, a.score ?? null]));
   const activeKcalByDay = new Map(activity.map((a) => [a.day, a.active_calories ?? null]));
   const totalKcalByDay = new Map(activity.map((a) => [a.day, a.total_calories ?? null]));
+  const sleepScoreByDay = new Map(dailySleep.map((d) => [d.day, d.score ?? null]));
 
   return Array.from(byDay.values()).map<DailyMetric>((b) => ({
     metricDate: b.day,
     sleepTotalMinutes: b.sleepMinutes || null,
     sleepEfficiencyPct: b.sleepEfficiency,
-    sleepScore: null, // Oura no longer exposes "sleep score" in v2 directly
+    sleepScore: sleepScoreByDay.get(b.day) ?? null,
     hrvRmssdMs: b.hrv,
     restingHrBpm: b.restingHr,
     recoveryScore: null,
