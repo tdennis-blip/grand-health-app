@@ -136,6 +136,7 @@ const CycleSchema = z.object({
     .object({
       strain: z.number().nullable().optional(),
       average_heart_rate: z.number().nullable().optional(),
+      kilojoule: z.number().nullable().optional(), // total energy for the cycle
     })
     .partial()
     .nullable()
@@ -274,6 +275,14 @@ async function fetchDailyRange(opts: {
       readinessScore: null,
       strainScore: b.cycle?.score?.strain ?? null,
       activityScore: null,
+      // Whoop reports total energy (incl. BMR), not active-only. Store as
+      // total_kcal; leave active_kcal null so the diet engine doesn't
+      // double-count the resting base (it falls back to the MET estimate).
+      activeKcal: null,
+      totalKcal:
+        b.cycle?.score?.kilojoule != null
+          ? Math.round(b.cycle.score.kilojoule * 0.239006)
+          : null,
       raw: { cycle: b.cycle, recovery: b.recovery, sleep: b.sleep },
     };
   });

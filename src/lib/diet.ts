@@ -4,6 +4,9 @@
 import { getUser } from "@/lib/auth/server";
 import { withAuth } from "@/lib/db/connection";
 import type { AuthUser } from "@/lib/auth/server";
+import { getActiveKcalForDate } from "@/lib/activity-calories";
+
+export type ActivityMode = "static" | "dynamic";
 
 export type DietPlanRow = {
   rmrValue: number | null;
@@ -19,6 +22,16 @@ export type DietPlanRow = {
   mealsPerDay: number;
   waterL: number;
   notes: string | null;
+  activityMode: ActivityMode;
+  baseMultiplier: number;
+  activityCreditPct: number;
+};
+
+// Optional per-day activity input for dynamic plans.
+export type ActivityInput = {
+  activeKcal: number;                       // raw active calories for the day
+  source: "wearable" | "estimated" | "none";
+  provider?: string | null;
 };
 
 export type DietTargets = {
@@ -35,11 +48,43 @@ export type DietTargets = {
   rmrMethod: string | null;
   activityMultiplier: number;
   deficitKcal: number;
+  // Activity-aware fields
+  activityMode: ActivityMode;
+  baseKcal: number;            // resting/base portion of TDEE
+  activeKcalRaw: number;       // measured/estimated active calories
+  activeKcalCredited: number;  // portion actually added to the target
+  activityCreditPct: number;
+  activitySource: "wearable" | "estimated" | "none";
+  activityProvider: string | null;
 };
 
-export function deriveTargets(plan: DietPlanRow, weightKg: number | null): DietTargets {
+export function deriveTargets(
+  plan: DietPlanRow,
+  weightKg: number | null,
+  activity?: ActivityInput | null
+): DietTargets {
   const rmr = plan.rmrValue ?? 0;
-  const tdee = Math.round(rmr * plan.activityMultiplier);
+
+  let baseKcal: number;
+  let activeKcalRaw = 0;
+  let activeKcalCredited = 0;
+  let activitySource: "wearable" | "estimated" | "none" = "none";
+  let activityProvider: string | null = null;
+
+  if (plan.activityMode === "dynamic") {
+    // Resting base from a near-sedentary multiplier, then add credited
+    // activity calories so we don't double-count movement.
+    baseKcal = Math.round(rmr * plan.baseMultiplier);
+    activeKcalRaw = activity?.activeKcal ?? 0;
+    activitySource = activity?.source ?? "none";
+    activityProvider = activity?.provider ?? null;
+    activeKcalCredited = Math.round(activeKcalRaw * (plan.activityCreditPct / 100));
+  } else {
+    // Static: legacy single-multiplier TDEE.
+    baseKcal = Math.round(rmr * plan.activityMultiplier);
+  }
+
+  const tdee = baseKcal + activeKcalCredited;
   const goalKcal = tdee + plan.deficitKcal;
   const proteinG = weightKg ? Math.round(weightKg * plan.proteinPerKg) : 0;
   const carbsG = Math.round((goalKcal * (plan.carbsPct / 100)) / 4);
@@ -58,6 +103,13 @@ export function deriveTargets(plan: DietPlanRow, weightKg: number | null): DietT
     rmrMethod: plan.rmrMethod,
     activityMultiplier: plan.activityMultiplier,
     deficitKcal: plan.deficitKcal,
+    activityMode: plan.activityMode,
+    baseKcal,
+    activeKcalRaw,
+    activeKcalCredited,
+    activityCreditPct: plan.activityCreditPct,
+    activitySource,
+    activityProvider,
   };
 }
 
@@ -397,6 +449,17 @@ export async function getMyDietTargets(): Promise<{
     mealsPerDay: plan.meals_per_day,
     waterL: Number(plan.water_l),
     notes: plan.notes,
+    activityMode: (plan.activity_mode === "dynamic" ? "dynamic" : "static") as ActivityMode,
+    baseMultiplier: Number(plan.base_multiplier ?? 1.2),
+    activityCreditPct: Number(plan.activity_credit_pct ?? 50),
   };
-  return { targets: deriveTargets(planRow, weightKg), weightKg };
+
+  // Only spend a query on activity when the plan actually uses it.
+  let activity: ActivityInput | null = null;
+  if (planRow.activityMode === "dynamic") {
+    const res = await getActiveKcalForDate(user, isoDate(new Date()), weightKg);
+    activity = { activeKcal: res.kcal, source: res.source, provider: res.provider };
+  }
+
+  return { targets: deriveTargets(planRow, weightKg, activity), weightKg };
 }

@@ -74,12 +74,41 @@ export default async function PatientDiet() {
         <>
           {/* Headline kcal */}
           <div className="bg-gradient-to-br from-orange-500 via-orange-500 to-rose-500 text-white rounded-3xl p-5">
-            <div className="text-[10px] uppercase tracking-wide opacity-90">Daily kcal goal</div>
-            <div className="text-4xl font-semibold mt-1 tabular-nums">{targets.goalKcal.toLocaleString()}</div>
-            <div className="text-[12px] opacity-90 mt-1">
-              TDEE {targets.tdee.toLocaleString()}
-              {targets.deficitKcal !== 0 && ` · ${targets.deficitKcal > 0 ? "+" : ""}${targets.deficitKcal} kcal/day`}
+            <div className="flex items-center justify-between">
+              <div className="text-[10px] uppercase tracking-wide opacity-90">Daily kcal goal</div>
+              {targets.activityMode === "dynamic" && targets.activitySource !== "none" && (
+                <span className="text-[9.5px] uppercase tracking-wide font-semibold bg-white/20 rounded-full px-2 py-0.5">
+                  {targets.activitySource === "wearable"
+                    ? `${targets.activityProvider ?? "wearable"} synced`
+                    : "estimated"}
+                </span>
+              )}
             </div>
+            <div className="text-4xl font-semibold mt-1 tabular-nums">{targets.goalKcal.toLocaleString()}</div>
+            {targets.activityMode === "dynamic" ? (
+              <>
+                <div className="text-[12px] opacity-90 mt-1">
+                  Base {targets.baseKcal.toLocaleString()}
+                  {targets.activeKcalCredited > 0 && ` + ${targets.activeKcalCredited} from activity`}
+                  {targets.deficitKcal !== 0 && ` · ${targets.deficitKcal > 0 ? "+" : ""}${targets.deficitKcal} kcal/day`}
+                </div>
+                {targets.activeKcalRaw > 0 && targets.activityCreditPct < 100 && (
+                  <div className="text-[10.5px] opacity-80 mt-1">
+                    {targets.activeKcalRaw.toLocaleString()} active kcal today · crediting {targets.activityCreditPct}%
+                  </div>
+                )}
+                {targets.activeKcalCredited === 0 && (
+                  <div className="text-[10.5px] opacity-80 mt-1">
+                    Goal rises as you log workouts or sync your wearable.
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="text-[12px] opacity-90 mt-1">
+                TDEE {targets.tdee.toLocaleString()}
+                {targets.deficitKcal !== 0 && ` · ${targets.deficitKcal > 0 ? "+" : ""}${targets.deficitKcal} kcal/day`}
+              </div>
+            )}
           </div>
 
           {/* Today logged vs target — progress bars */}

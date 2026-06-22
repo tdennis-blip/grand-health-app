@@ -176,6 +176,8 @@ export async function upsertDailyMetrics(
     readiness_score:      m.readinessScore ?? null,
     strain_score:         m.strainScore ?? null,
     activity_score:       m.activityScore ?? null,
+    active_kcal:          m.activeKcal ?? null,
+    total_kcal:           m.totalKcal ?? null,
     raw:                  m.raw ?? null,
     fetched_at:           new Date().toISOString(),
   }));
@@ -192,6 +194,8 @@ export async function upsertDailyMetrics(
       readiness_score      = EXCLUDED.readiness_score,
       strain_score         = EXCLUDED.strain_score,
       activity_score       = EXCLUDED.activity_score,
+      active_kcal          = EXCLUDED.active_kcal,
+      total_kcal           = EXCLUDED.total_kcal,
       raw                  = EXCLUDED.raw,
       fetched_at           = EXCLUDED.fetched_at
   `;

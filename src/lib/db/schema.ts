@@ -403,6 +403,7 @@ export const sessionLibrary = pgTable(
     name: text("name").notNull(),
     focus: text("focus"),
     estMinutes: integer("est_minutes").default(45).notNull(),
+    met: text("met"), // numeric(3,1) override for calorie estimation; NULL = per-kind default
     accent: text("accent"),
     coachNote: text("coach_note"),
     // cardio-only fields
@@ -559,6 +560,9 @@ export const dietPlans = pgTable(
     rmrMeasuredBy: text("rmr_measured_by"),
     // numeric(3,2)/(3,1) — return strings from pg by default; keep as text in the type
     activityMultiplier: text("activity_multiplier").default("1.55").notNull(),
+    activityMode: text("activity_mode").default("static").notNull(), // 'static' | 'dynamic'
+    baseMultiplier: text("base_multiplier").default("1.20").notNull(),
+    activityCreditPct: integer("activity_credit_pct").default(50).notNull(),
     deficitKcal: integer("deficit_kcal").default(0).notNull(),
     proteinPerKg: text("protein_per_kg").default("1.6").notNull(),
     carbsPct: integer("carbs_pct").default(45).notNull(),
@@ -1020,6 +1024,8 @@ export const wearableDailyMetrics = pgTable(
     readinessScore: integer("readiness_score"),
     strainScore: text("strain_score"),
     activityScore: integer("activity_score"),
+    activeKcal: integer("active_kcal"),
+    totalKcal: integer("total_kcal"),
     raw: jsonb("raw"),
     fetchedAt: timestamp("fetched_at", { withTimezone: true }).defaultNow().notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

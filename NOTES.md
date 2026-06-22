@@ -42,6 +42,25 @@ Remaining: browser smoke test — clinician program → strength session with ex
 
 ---
 
+## 📋 Session log 2026-06-22 — activity-aware calorie targets (built, NOT yet shipped)
+
+Make the patient's daily kcal goal respond to exercise. Each diet plan has an `activity_mode`:
+- **static** (default, legacy) — unchanged: `TDEE = RMR × activity_multiplier`, `goal = TDEE + deficit`.
+- **dynamic** — `goal = RMR × base_multiplier + credited active kcal + deficit`, where `credited = round(active_kcal × activity_credit_pct/100)`. Base multiplier is deliberately near-sedentary (default 1.20) so exercise added on top doesn't double-count. Credit % (default 50) is the "don't eat back 100% of exercise" knob, clinician-set.
+
+Active calories per day come from (priority order): **(1) wearable** `wearable_daily_metrics.active_kcal`, else **(2) MET estimate** from the sessions scheduled for that weekday in the patient's active program — `kcal = MET × bodyweight(kg) × est_minutes/60`, MET per session kind (strength 5.0 / zone2 6.5 / vo2max 8.5 / mobility 2.8), overridable via new `session_library.met`.
+
+Files: **migration `0020_activity_aware_calories.sql`** (diet_plans.activity_mode/base_multiplier/activity_credit_pct + checks; wearable_daily_metrics.active_kcal/total_kcal; session_library.met), `lib/activity-calories.ts` (new), `lib/diet.ts` (deriveTargets + DietTargets/DietPlanRow + getMyDietTargets now compute the day's activity), wearable fetchers (`types.ts` DailyMetric, `sync.ts` upsert, `oura.ts` daily_activity active_calories/total_calories, `whoop.ts` kilojoule→total_kcal only — Whoop has no active-only figure so those days fall back to MET), clinician editor (`diet/actions.ts` schema+SQL, `diet/diet-plan-card.tsx` mode toggle + base + credit slider, `patient/[id]/page.tsx` initial mapping ×2), patient `home/diet/page.tsx` goal card breakdown + source badge, `db/schema.ts`.
+
+**Typecheck:** clean on the real `src/` copy (the stale nested `grand-health-app/grand-health-app/` duplicates still throw pre-existing errors but are gitignored and not deployed — yet another reason to move the repo out of iCloud).
+
+**⏳ TO SHIP:**
+1. **Run migration on staging** (idempotent): `psql "$DIRECT_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/0020_activity_aware_calories.sql` (tunnel + `DIRECT_DATABASE_URL` as for 0019).
+2. `git add -A && git commit -m "Activity-aware calorie targets (wearable + MET, clinician credit %)" && git push`.
+3. Test: clinician → a patient's Diet plan card → switch to **Dynamic**, set base 1.20 + credit 50% → save. As that patient, Diet screen goal shows `Base N + M from activity`. With a logged/scheduled workout (or a wearable active_kcal row), the goal rises; badge shows "estimated" or "<provider> synced".
+
+---
+
 ## Original plan / context (Staging deploy migration)
 
 **Goal:** get the app live on a shared URL for internal testing, HIPAA-compliant, AWS + GitHub.

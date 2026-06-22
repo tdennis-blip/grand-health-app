@@ -17,6 +17,8 @@ export type DailyMetric = {
   readinessScore?: number | null;
   strainScore?: number | null;
   activityScore?: number | null;
+  activeKcal?: number | null;   // exercise/movement calories
+  totalKcal?: number | null;    // active + resting (provider total)
   raw: unknown;
 };
 

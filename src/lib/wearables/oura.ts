@@ -141,6 +141,8 @@ const ReadinessRowSchema = z.object({
 const ActivityRowSchema = z.object({
   day: z.string(),
   score: z.number().nullable().optional(),
+  active_calories: z.number().nullable().optional(), // kcal from movement
+  total_calories: z.number().nullable().optional(),  // active + resting
 }).passthrough();
 
 async function ouraGet<T>(
@@ -236,6 +238,8 @@ async function fetchDailyRange(opts: {
 
   const readinessByDay = new Map(readiness.map((r) => [r.day, r.score ?? null]));
   const activityByDay = new Map(activity.map((a) => [a.day, a.score ?? null]));
+  const activeKcalByDay = new Map(activity.map((a) => [a.day, a.active_calories ?? null]));
+  const totalKcalByDay = new Map(activity.map((a) => [a.day, a.total_calories ?? null]));
 
   return Array.from(byDay.values()).map<DailyMetric>((b) => ({
     metricDate: b.day,
@@ -248,6 +252,8 @@ async function fetchDailyRange(opts: {
     readinessScore: readinessByDay.get(b.day) ?? null,
     strainScore: null,
     activityScore: activityByDay.get(b.day) ?? null,
+    activeKcal: activeKcalByDay.get(b.day) ?? null,
+    totalKcal: totalKcalByDay.get(b.day) ?? null,
     raw: b.raw,
   }));
 }

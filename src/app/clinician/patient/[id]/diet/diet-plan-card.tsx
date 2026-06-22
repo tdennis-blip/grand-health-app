@@ -10,6 +10,9 @@ type DietForm = {
   rmrMeasuredOn: string | null;
   rmrMeasuredBy: string | null;
   activityMultiplier: number;
+  activityMode: "static" | "dynamic";
+  baseMultiplier: number;
+  activityCreditPct: number;
   deficitKcal: number;
   proteinPerKg: number;
   carbsPct: number;
@@ -26,6 +29,9 @@ const DEFAULTS: DietForm = {
   rmrMeasuredOn: null,
   rmrMeasuredBy: null,
   activityMultiplier: 1.55,
+  activityMode: "static",
+  baseMultiplier: 1.2,
+  activityCreditPct: 50,
   deficitKcal: 0,
   proteinPerKg: 1.6,
   carbsPct: 45,
@@ -42,6 +48,12 @@ const ACTIVITY_LEVELS = [
   { mult: 1.55, label: "Moderately active" },
   { mult: 1.725, label: "Very active" },
   { mult: 1.90, label: "Athlete" },
+];
+
+const BASE_LEVELS = [
+  { mult: 1.10, label: "Resting only" },
+  { mult: 1.20, label: "Sedentary base" },
+  { mult: 1.30, label: "Light base" },
 ];
 
 export function DietPlanCard({
@@ -61,19 +73,28 @@ export function DietPlanCard({
     setSaved(false);
   };
 
+  // Example active-calorie burn used only to preview the dynamic formula.
+  const EXAMPLE_ACTIVE_KCAL = 400;
+
   // Derived targets
   const derived = useMemo(() => {
     const rmr = form.rmrValue || 0;
-    const mult = form.activityMultiplier || 1.55;
-    const tdee = Math.round(rmr * mult);
+    let base: number;
+    let exampleCredit = 0;
+    if (form.activityMode === "dynamic") {
+      base = Math.round(rmr * (form.baseMultiplier || 1.2));
+      exampleCredit = Math.round(EXAMPLE_ACTIVE_KCAL * (form.activityCreditPct / 100));
+    } else {
+      base = Math.round(rmr * (form.activityMultiplier || 1.55));
+    }
+    const tdee = base + exampleCredit;
     const goalKcal = tdee + form.deficitKcal;
     const proteinG = weightKg ? Math.round(weightKg * form.proteinPerKg) : 0;
-    const proteinKcal = proteinG * 4;
     const carbsKcal = Math.round(goalKcal * (form.carbsPct / 100));
     const fatKcal = Math.round(goalKcal * (form.fatPct / 100));
     const carbsG = Math.round(carbsKcal / 4);
     const fatG = Math.round(fatKcal / 9);
-    return { tdee, goalKcal, proteinG, carbsG, fatG };
+    return { tdee, goalKcal, proteinG, carbsG, fatG, base, exampleCredit };
   }, [form, weightKg]);
 
   const macroSum = form.carbsPct + form.fatPct; // protein is grams-based, not %
@@ -86,6 +107,9 @@ export function DietPlanCard({
     form.rmrMeasuredOn !== initialForCompare.rmrMeasuredOn ||
     form.rmrMeasuredBy !== initialForCompare.rmrMeasuredBy ||
     form.activityMultiplier !== initialForCompare.activityMultiplier ||
+    form.activityMode !== initialForCompare.activityMode ||
+    form.baseMultiplier !== initialForCompare.baseMultiplier ||
+    form.activityCreditPct !== initialForCompare.activityCreditPct ||
     form.deficitKcal !== initialForCompare.deficitKcal ||
     form.proteinPerKg !== initialForCompare.proteinPerKg ||
     form.carbsPct !== initialForCompare.carbsPct ||
@@ -105,6 +129,9 @@ export function DietPlanCard({
         rmrMeasuredOn: form.rmrMeasuredOn,
         rmrMeasuredBy: form.rmrMeasuredBy,
         activityMultiplier: form.activityMultiplier,
+        activityMode: form.activityMode,
+        baseMultiplier: form.baseMultiplier,
+        activityCreditPct: form.activityCreditPct,
         deficitKcal: form.deficitKcal,
         proteinPerKg: form.proteinPerKg,
         carbsPct: form.carbsPct,
@@ -139,7 +166,16 @@ export function DietPlanCard({
 
       {/* Derived targets — live preview */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
-        <Tile label="Daily kcal goal" value={derived.goalKcal.toLocaleString()} sub={`TDEE ${derived.tdee.toLocaleString()}${form.deficitKcal !== 0 ? ` · ${form.deficitKcal > 0 ? "+" : ""}${form.deficitKcal}` : ""}`} tone="orange" />
+        <Tile
+          label={form.activityMode === "dynamic" ? "Goal (example day)" : "Daily kcal goal"}
+          value={derived.goalKcal.toLocaleString()}
+          sub={
+            form.activityMode === "dynamic"
+              ? `Base ${derived.base.toLocaleString()} + ${derived.exampleCredit} active${form.deficitKcal !== 0 ? ` · ${form.deficitKcal > 0 ? "+" : ""}${form.deficitKcal}` : ""}`
+              : `TDEE ${derived.tdee.toLocaleString()}${form.deficitKcal !== 0 ? ` · ${form.deficitKcal > 0 ? "+" : ""}${form.deficitKcal}` : ""}`
+          }
+          tone="orange"
+        />
         <Tile label="Protein" value={`${derived.proteinG}g`} sub={weightKg ? `${form.proteinPerKg.toFixed(1)} g/kg × ${weightKg} kg` : "set weight first"} tone="teal" />
         <Tile label="Carbs" value={`${derived.carbsG}g`} sub={`${form.carbsPct}% of kcal`} tone="amber" />
         <Tile label="Fat"   value={`${derived.fatG}g`}   sub={`${form.fatPct}% of kcal`} tone="rose" />
@@ -172,26 +208,101 @@ export function DietPlanCard({
       {/* Activity + deficit */}
       <div className="border-t border-slate-100 pt-3 mt-3 space-y-3">
         <div className="text-[11px] uppercase tracking-wide text-slate-500 font-semibold">Energy balance</div>
+
+        {/* Mode toggle */}
         <div>
-          <Label>Activity multiplier</Label>
-          <div className="flex flex-wrap gap-1.5">
-            {ACTIVITY_LEVELS.map((a) => {
-              const active = Math.abs(a.mult - form.activityMultiplier) < 0.01;
-              return (
-                <button
-                  key={a.label}
-                  type="button"
-                  onClick={() => update("activityMultiplier", a.mult)}
-                  className={`text-xs px-2.5 py-1 rounded-lg border transition ${
-                    active ? "bg-teal-700 text-white border-teal-700" : "bg-white text-slate-700 border-slate-200 hover:border-slate-300"
-                  }`}
-                >
-                  {a.label} · {a.mult.toFixed(2)}
-                </button>
-              );
-            })}
+          <Label>How to count activity</Label>
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              onClick={() => update("activityMode", "static")}
+              className={`text-xs px-3 py-1.5 rounded-lg border transition ${
+                form.activityMode === "static" ? "bg-teal-700 text-white border-teal-700" : "bg-white text-slate-700 border-slate-200 hover:border-slate-300"
+              }`}
+            >
+              Static multiplier
+            </button>
+            <button
+              type="button"
+              onClick={() => update("activityMode", "dynamic")}
+              className={`text-xs px-3 py-1.5 rounded-lg border transition ${
+                form.activityMode === "dynamic" ? "bg-teal-700 text-white border-teal-700" : "bg-white text-slate-700 border-slate-200 hover:border-slate-300"
+              }`}
+            >
+              Dynamic (track exercise)
+            </button>
+          </div>
+          <div className="text-[10.5px] text-slate-500 leading-snug mt-1.5">
+            {form.activityMode === "static"
+              ? "Fixed daily target: RMR × multiplier. Doesn't change with workouts."
+              : "Daily target adjusts to logged activity: RMR × base + a share of that day's active calories (wearable, or estimated from scheduled sessions)."}
           </div>
         </div>
+
+        {form.activityMode === "static" ? (
+          <div>
+            <Label>Activity multiplier</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {ACTIVITY_LEVELS.map((a) => {
+                const active = Math.abs(a.mult - form.activityMultiplier) < 0.01;
+                return (
+                  <button
+                    key={a.label}
+                    type="button"
+                    onClick={() => update("activityMultiplier", a.mult)}
+                    className={`text-xs px-2.5 py-1 rounded-lg border transition ${
+                      active ? "bg-teal-700 text-white border-teal-700" : "bg-white text-slate-700 border-slate-200 hover:border-slate-300"
+                    }`}
+                  >
+                    {a.label} · {a.mult.toFixed(2)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <>
+            <div>
+              <Label>Resting base multiplier</Label>
+              <div className="flex flex-wrap gap-1.5">
+                {BASE_LEVELS.map((a) => {
+                  const active = Math.abs(a.mult - form.baseMultiplier) < 0.01;
+                  return (
+                    <button
+                      key={a.label}
+                      type="button"
+                      onClick={() => update("baseMultiplier", a.mult)}
+                      className={`text-xs px-2.5 py-1 rounded-lg border transition ${
+                        active ? "bg-teal-700 text-white border-teal-700" : "bg-white text-slate-700 border-slate-200 hover:border-slate-300"
+                      }`}
+                    >
+                      {a.label} · {a.mult.toFixed(2)}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="text-[10.5px] text-slate-500 leading-snug mt-1.5">
+                Near-sedentary on purpose — exercise is added on top, so a high base would double-count.
+              </div>
+            </div>
+            <div>
+              <Label>Credit {form.activityCreditPct}% of active calories</Label>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={5}
+                value={form.activityCreditPct}
+                onChange={(e) => update("activityCreditPct", Math.round(Number(e.target.value)))}
+                className="w-full accent-teal-700"
+              />
+              <div className="text-[10.5px] text-slate-500 leading-snug mt-1">
+                e.g. a {EXAMPLE_ACTIVE_KCAL} kcal workout adds <span className="font-semibold tabular-nums">+{derived.exampleCredit}</span> kcal. 50–75% avoids over-eating back exercise.
+              </div>
+            </div>
+          </>
+        )}
+
         <NumField label="Deficit / surplus (kcal/day)" value={form.deficitKcal}
           onChange={(v) => update("deficitKcal", v)}
           hint="Negative = deficit, positive = surplus, 0 = maintain." />
