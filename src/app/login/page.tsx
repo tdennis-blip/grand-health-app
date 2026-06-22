@@ -96,6 +96,12 @@ export default function LoginPage() {
             Patients and clinicians use the same login — your role is set by your clinician.
           </p>
         </form>
+
+        <div className="pt-1 text-center text-[11px] text-slate-400">
+          <a href="/privacy" className="hover:text-slate-600 underline underline-offset-2">Privacy Policy</a>
+          <span className="mx-2">·</span>
+          <a href="/terms" className="hover:text-slate-600 underline underline-offset-2">Terms of Service</a>
+        </div>
       </div>
     </main>
   );
