@@ -75,6 +75,9 @@ export class AppRuntime extends Construct {
         CLOUDINARY_CLOUD_NAME: cdk.SecretValue.unsafePlainText("REPLACE_ME"),
         CLOUDINARY_API_KEY: cdk.SecretValue.unsafePlainText("REPLACE_ME"),
         CLOUDINARY_API_SECRET: cdk.SecretValue.unsafePlainText("REPLACE_ME"),
+        OURA_CLIENT_ID: cdk.SecretValue.unsafePlainText("REPLACE_ME"),
+        OURA_CLIENT_SECRET: cdk.SecretValue.unsafePlainText("REPLACE_ME"),
+        OURA_WEBHOOK_SECRET: cdk.SecretValue.unsafePlainText("REPLACE_ME"),
       },
     });
 
@@ -185,6 +188,9 @@ export class AppRuntime extends Construct {
       CLOUDINARY_CLOUD_NAME: ecs.Secret.fromSecretsManager(this.appEnvSecret, "CLOUDINARY_CLOUD_NAME"),
       CLOUDINARY_API_KEY: ecs.Secret.fromSecretsManager(this.appEnvSecret, "CLOUDINARY_API_KEY"),
       CLOUDINARY_API_SECRET: ecs.Secret.fromSecretsManager(this.appEnvSecret, "CLOUDINARY_API_SECRET"),
+      OURA_CLIENT_ID: ecs.Secret.fromSecretsManager(this.appEnvSecret, "OURA_CLIENT_ID"),
+      OURA_CLIENT_SECRET: ecs.Secret.fromSecretsManager(this.appEnvSecret, "OURA_CLIENT_SECRET"),
+      OURA_WEBHOOK_SECRET: ecs.Secret.fromSecretsManager(this.appEnvSecret, "OURA_WEBHOOK_SECRET"),
     };
 
     const service = new ecsp.ApplicationLoadBalancedFargateService(this, "Service", {

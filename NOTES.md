@@ -42,6 +42,20 @@ Remaining: browser smoke test — clinician program → strength session with ex
 
 ---
 
+## 📋 Session log 2026-06-22 — Oura ring: wiring secrets to go live
+
+Oura code was already complete (client, OAuth start/callback, webhook, registry, integrations tile). Gap: the three `OURA_*` env vars were never injected into the running container — the ECS task def in `infra/lib/app-runtime.ts` enumerates each secret key explicitly. **Added `OURA_CLIENT_ID` / `OURA_CLIENT_SECRET` / `OURA_WEBHOOK_SECRET`** to both the `secretObjectValue` defaults and the `secrets` (ecs.Secret.fromSecretsManager) map. CI/CD (`deploy.yml`) just describes the existing task def + swaps the image, so the CDK-defined secrets carry forward — only a `cdk deploy` adds them.
+
+Facts for setup: OAuth scopes requested = `email personal daily heartrate` (the `daily` scope covers daily_activity → active_calories for the dynamic-calorie feature). Redirect URI = `https://staging.mygrandhealth.com/api/wearables/oura/callback`. Webhook receiver = `https://staging.mygrandhealth.com/api/wearables/oura/webhook` (optional; connect-time 14-day backfill + daily sync cron already pull data without it). Connect flow is patient-only, started by `/api/wearables/oura/start`.
+
+**⏳ TO GO LIVE (Oura):**
+1. Register an app at https://cloud.ouraring.com/oauth/applications → redirect URI above → copy Client ID + Secret.
+2. Put all three keys into `grand-health/staging/app-env` (read-modify-write with jq; `OURA_WEBHOOK_SECRET` can be `openssl rand -hex 16`). **Set values before deploying** or the new task crash-loops resolving the missing JSON key.
+3. `git push` then `cd infra && npx cdk deploy -c stage=staging -c withService=true -c domain=staging.mygrandhealth.com -c hostedZone=staging.mygrandhealth.com` (adds the secrets to the task def + rolls the service).
+4. Test: patient → Me → integrations → Connect Oura Ring → authorize → bounces back "Connected… pulling last 14 days"; wearable Today card + clinician 30-day trend populate; `active_kcal` rows feed the dynamic calorie goal.
+
+---
+
 ## 📋 Session log 2026-06-22 — activity-aware calorie targets (built, NOT yet shipped)
 
 Make the patient's daily kcal goal respond to exercise. Each diet plan has an `activity_mode`:
