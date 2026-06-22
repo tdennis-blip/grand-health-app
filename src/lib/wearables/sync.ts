@@ -48,6 +48,21 @@ export async function listActiveConnections(): Promise<ConnectionRow[]> {
   `;
 }
 
+// Active connections for one patient, with last_synced_at so callers can
+// rate-limit on-demand (app-open) refreshes.
+export type ConnectionWithSync = ConnectionRow & { last_synced_at: string | null };
+
+export async function listActiveConnectionsForPatient(
+  patientId: string
+): Promise<ConnectionWithSync[]> {
+  return serviceRoleSql<ConnectionWithSync[]>`
+    SELECT id, clinic_id, patient_id, provider, provider_user_id,
+           access_token, refresh_token, token_expires_at, scope, status, last_synced_at
+    FROM wearable_connections
+    WHERE status = 'active' AND patient_id = ${patientId}
+  `;
+}
+
 /**
  * Ensure the connection's access token is fresh; if expiry is within 60s,
  * exchange the refresh token and persist the new pair.

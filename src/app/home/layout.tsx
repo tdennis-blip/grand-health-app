@@ -1,6 +1,7 @@
 import { requirePatient } from "@/lib/auth/server";
 import { BottomTabBar } from "./bottom-tab-bar";
 import { getMyUnreadCount } from "@/lib/messages";
+import { WearableRefresh } from "./wearable-refresh";
 
 export default async function PatientLayout({
   children,
@@ -27,6 +28,7 @@ export default async function PatientLayout({
           covers the last bit of the page. */}
       <main className="flex-1 pb-24">{children}</main>
 
+      <WearableRefresh />
       <BottomTabBar chatUnread={chatUnread} />
     </div>
   );
