@@ -29,9 +29,6 @@ export default async function PatientStackPage() {
       )
     : [];
 
-  // Only show meds/supps with at least one dose; the editor view (clinician)
-  // covers items without doses.
-  const stackWithDoses = stack.filter((m) => m.doses.length > 0);
   const refillByMed: Record<string, ReturnType<typeof refillStatus>> = {};
   for (const m of stack) refillByMed[m.id] = refillStatus(m);
 
@@ -113,7 +110,7 @@ export default async function PatientStackPage() {
               Your full list
             </div>
             <div className="space-y-2">
-              {stackWithDoses.map((m) => {
+              {stack.map((m) => {
                 const r = refillByMed[m.id];
                 return (
                   <div key={m.id} className="border border-slate-200 rounded-xl px-3 py-2">
@@ -124,7 +121,9 @@ export default async function PatientStackPage() {
                           {m.dose && <span className="text-slate-400 font-normal"> · {m.dose}</span>}
                         </div>
                         <div className="text-[11px] text-slate-500 truncate">
-                          {m.doses.length} {m.doses.length === 1 ? "dose" : "doses"} per schedule
+                          {m.doses.length === 0
+                            ? "No dose schedule yet"
+                            : `${m.doses.length} ${m.doses.length === 1 ? "dose" : "doses"} per schedule`}
                           {m.pillarName && (
                             <span className="text-violet-700"> · {m.pillarName}</span>
                           )}
