@@ -31,7 +31,7 @@ export async function WearableTrendCard({ patientId }: { patientId: string }) {
   }
 
   // Sort ascending for chart, group by provider for the per-provider labels.
-  const ascending = rows.slice().sort((a, b) => a.metric_date.localeCompare(b.metric_date));
+  const ascending = rows.slice().sort((a, b) => String(a.metric_date).localeCompare(String(b.metric_date)));
   const latest = ascending[ascending.length - 1];
 
   const sleepSeries = ascending.map((r) => r.sleep_total_minutes ?? null);

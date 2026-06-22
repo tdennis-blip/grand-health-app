@@ -31,7 +31,7 @@ export async function getRecentMetrics(
   const sinceIso = since.toISOString().slice(0, 10);
 
   const rows = await serviceRoleSql<DailyMetricRow[]>`
-    SELECT metric_date, provider,
+    SELECT metric_date::text AS metric_date, provider,
            sleep_total_minutes, sleep_efficiency_pct, sleep_score,
            hrv_rmssd_ms, resting_hr_bpm, recovery_score,
            readiness_score, strain_score, activity_score,
@@ -49,7 +49,7 @@ export async function getLatestMetric(
   patientId: string
 ): Promise<DailyMetricRow | null> {
   const [row] = await serviceRoleSql<DailyMetricRow[]>`
-    SELECT metric_date, provider,
+    SELECT metric_date::text AS metric_date, provider,
            sleep_total_minutes, sleep_efficiency_pct, sleep_score,
            hrv_rmssd_ms, resting_hr_bpm, recovery_score,
            readiness_score, strain_score, activity_score,
