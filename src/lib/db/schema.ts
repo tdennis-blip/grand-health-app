@@ -485,6 +485,26 @@ export const exerciseSetLogs = pgTable(
   })
 );
 
+export const cardioSessionLogs = pgTable(
+  "cardio_session_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clinicId: uuid("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
+    patientId: uuid("patient_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+    sessionId: uuid("session_id").notNull().references(() => sessionLibrary.id, { onDelete: "cascade" }),
+    logDate: date("log_date").notNull(),
+    actualMinutes: integer("actual_minutes"),
+    done: boolean("done").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    patientDateIdx: index("cardio_session_logs_patient_date_idx").on(t.patientId, t.logDate),
+    sessionIdx: index("cardio_session_logs_session_idx").on(t.sessionId),
+    uniqPatientSessionDate: unique("cardio_session_logs_patient_session_date_key").on(t.patientId, t.sessionId, t.logDate),
+  })
+);
+
 export const programLibrary = pgTable(
   "program_library",
   {

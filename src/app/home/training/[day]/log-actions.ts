@@ -46,3 +46,42 @@ export async function logSet(input: z.infer<typeof logSetSchema>) {
 
   revalidatePath(`/home/training/${parsed.day}`);
 }
+
+const logCardioSchema = z.object({
+  sessionId: z.string().uuid(),
+  day: z.string().min(1).max(8),
+  logDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  actualMinutes: z.number().int().min(0).max(1440).nullable(),
+  done: z.boolean(),
+});
+
+// Upsert the patient's completion + actual minutes for a cardio session (zone2
+// / vo2max) on a given date.
+export async function logCardioSession(input: z.infer<typeof logCardioSchema>) {
+  const parsed = logCardioSchema.parse(input);
+  const user = await requirePatient();
+
+  await withAuth(user, (sql) =>
+    sql`
+      INSERT INTO cardio_session_logs
+        (clinic_id, patient_id, session_id, log_date, actual_minutes, done)
+      VALUES
+        (${user.clinicId}, ${user.id}, ${parsed.sessionId}, ${parsed.logDate},
+         ${parsed.actualMinutes}, ${parsed.done})
+      ON CONFLICT (patient_id, session_id, log_date) DO UPDATE SET
+        actual_minutes = EXCLUDED.actual_minutes,
+        done = EXCLUDED.done,
+        updated_at = now()
+    `
+  );
+
+  await recordAudit({
+    action: "update",
+    entityType: "cardio_session_log",
+    entityId: parsed.sessionId,
+    patientId: user.id,
+    meta: { minutes: parsed.actualMinutes, done: parsed.done, date: parsed.logDate },
+  });
+
+  revalidatePath(`/home/training/${parsed.day}`);
+}

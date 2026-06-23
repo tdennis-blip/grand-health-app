@@ -250,3 +250,23 @@ export async function getSetLogsForSession(
   });
   return map;
 }
+
+export type CardioLog = { actualMinutes: number | null; done: boolean };
+
+// The patient's logged completion + actual minutes for a cardio session on a
+// given date (zone2 / vo2max). Null if nothing logged yet.
+export async function getCardioLogForSession(
+  sessionId: string,
+  logDate: string
+): Promise<CardioLog | null> {
+  const user = await getUser();
+  if (!user) return null;
+  const [row] = await withAuth(user, (sql) =>
+    sql`SELECT actual_minutes, done
+        FROM cardio_session_logs
+        WHERE patient_id = ${user.id} AND session_id = ${sessionId} AND log_date = ${logDate}
+        LIMIT 1`
+  );
+  if (!row) return null;
+  return { actualMinutes: row.actual_minutes, done: row.done };
+}

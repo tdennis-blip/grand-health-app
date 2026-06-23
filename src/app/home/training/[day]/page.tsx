@@ -6,11 +6,13 @@ import {
   getWeekSchedule,
   getSessionDetail,
   getSetLogsForSession,
+  getCardioLogForSession,
   DAY_KEYS,
   DAY_LABELS,
   type DayKey,
 } from "@/lib/training";
 import { SetLogger } from "./set-logger";
+import { CardioLogger } from "./cardio-logger";
 
 const KIND_ICON = {
   strength: Dumbbell, zone2: Activity, vo2max: Flame, mobility: Sparkles,
@@ -126,6 +128,10 @@ export default async function PatientSessionDetail({
     session.kind === "strength" || session.kind === "mobility"
       ? await getSetLogsForSession(session.id, logDate)
       : {};
+  const cardioLog =
+    session.kind === "zone2" || session.kind === "vo2max"
+      ? await getCardioLogForSession(session.id, logDate)
+      : null;
 
   const Icon = KIND_ICON[session.kind];
   const gradient = session.accent || KIND_TILE[session.kind];
@@ -173,6 +179,17 @@ export default async function PatientSessionDetail({
             />
           )}
         </section>
+      )}
+
+      {/* Zone 2 logging */}
+      {session.kind === "zone2" && (
+        <CardioLogger
+          sessionId={session.id}
+          day={day}
+          logDate={logDate}
+          prescribedMinutes={session.durationMin ?? session.estMinutes}
+          initial={cardioLog}
+        />
       )}
 
       {/* VO2 max body */}
