@@ -28,8 +28,18 @@ export function configureAmplify() {
 }
 
 export async function signInWithPassword(email: string, password: string) {
-  const result = await amplifySignIn({ username: email, password });
-  return result;
+  try {
+    const result = await amplifySignIn({ username: email, password });
+    return result;
+  } catch (err: unknown) {
+    // Amplify throws when a session already exists. That's effectively "signed
+    // in" — surface it as success so the caller can grab the token + redirect
+    // instead of showing a confusing error.
+    if (err instanceof Error && err.name === "UserAlreadyAuthenticatedException") {
+      return { isSignedIn: true, nextStep: { signInStep: "DONE" as const } };
+    }
+    throw err;
+  }
 }
 
 // Returns the current ID token string, or null if not signed in.

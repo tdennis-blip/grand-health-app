@@ -1,13 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { configureAmplify, signInWithPassword } from "@/lib/auth/client";
 
 configureAmplify();
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "error">("idle");
@@ -25,15 +23,19 @@ export default function LoginPage() {
         // Post the ID token to our server so it can set an httpOnly cookie.
         const { getIdToken } = await import("@/lib/auth/client");
         const idToken = await getIdToken();
-        if (idToken) {
-          await fetch("/auth/set-cookie", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ idToken }),
-          });
+        if (!idToken) {
+          setStatus("error");
+          setErrorMsg("Signed in but couldn't establish a session. Please try again.");
+          return;
         }
-        router.refresh();
-        router.push("/");
+        await fetch("/auth/set-cookie", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ idToken }),
+        });
+        // Full navigation so server middleware runs and routes to the
+        // role-appropriate home (/home or /clinician/dashboard).
+        window.location.assign("/");
       } else {
         setStatus("error");
         setErrorMsg("Sign-in incomplete — please try again.");
