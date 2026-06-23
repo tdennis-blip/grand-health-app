@@ -398,7 +398,7 @@ export async function getRecentFoodLogs(patientId: string, days = 14, user?: Aut
   const sinceIso = isoDate(since);
   const rows = await withAuth(resolvedUser, (sql) =>
     sql`
-      SELECT log_date, source, kcal, protein_g, carbs_g, fat_g, fiber_g, notes
+      SELECT log_date::text AS log_date, source, kcal, protein_g, carbs_g, fat_g, fiber_g, notes
       FROM food_logs
       WHERE patient_id = ${patientId} AND log_date >= ${sinceIso}
       ORDER BY log_date DESC
