@@ -118,31 +118,39 @@ function scoreSleep(
   today: DailyMetricRow | null,
   recent: DailyMetricRow[]
 ): DomainScore {
-  // Prefer today's row; otherwise fall back to the most recent night so the
-  // hero doesn't go blank if the tracker hasn't synced yet this morning.
-  const row = today ?? recent[0] ?? null;
+  // Prefer the most recent night with actual sleep data (duration/score) so the
+  // card isn't driven by a row that only has a partial signal. Today's row may
+  // carry just a sleep score before duration/HRV finalize.
+  const row =
+    (today?.sleep_total_minutes != null || today?.sleep_score != null ? today : null) ??
+    recent.find((r) => r.sleep_total_minutes != null || r.sleep_score != null) ??
+    today ??
+    recent[0] ??
+    null;
   if (!row) {
     return { value: null, caption: "Connect a tracker to score sleep" };
   }
-  const durationGoalMin = 8 * 60;
   const dur = row.sleep_total_minutes ?? null;
-  const eff = row.sleep_efficiency_pct != null ? Number(row.sleep_efficiency_pct) : null;
-  const recovery = row.recovery_score ?? row.readiness_score ?? null;
+  const hrv = row.hrv_rmssd_ms != null ? Number(row.hrv_rmssd_ms) : null;
+  const sleepScore = row.sleep_score != null ? Math.round(Number(row.sleep_score)) : null;
 
-  const parts: number[] = [];
-  if (dur != null) parts.push(clamp01(dur / durationGoalMin));
-  if (eff != null) parts.push(clamp01(eff / 100));
-  if (recovery != null) parts.push(clamp01(recovery / 100));
-  if (parts.length === 0) {
+  // Headline value is Oura's nightly sleep score when available.
+  if (sleepScore == null && dur == null) {
     return { value: null, caption: "Waiting on tonight's sync" };
   }
-  const value = Math.round((parts.reduce((a, b) => a + b, 0) / parts.length) * 100);
   const durLabel = dur != null ? `${Math.floor(dur / 60)}h ${dur % 60}m` : null;
   const captionBits = [
+    sleepScore != null ? `Score ${sleepScore}` : null,
     durLabel ? `${durLabel} sleep` : null,
-    eff != null ? `${Math.round(eff)}% eff` : null,
-    recovery != null ? `${Math.round(recovery)} recovery` : null,
+    hrv != null ? `${Math.round(hrv)}ms HRV` : null,
   ].filter(Boolean);
+  // If no sleep score yet, fall back to duration-vs-8h as the numeric value.
+  const value =
+    sleepScore != null
+      ? sleepScore
+      : dur != null
+      ? Math.round(clamp01(dur / (8 * 60)) * 100)
+      : null;
   return { value, caption: captionBits.join(" · ") || "Last night" };
 }
 

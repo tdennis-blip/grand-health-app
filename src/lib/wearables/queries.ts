@@ -221,15 +221,20 @@ export async function getSleepSummary(
   const longTrend = allNights;
   const shortTrend = allNights.slice(-7);
 
-  const last = [...allNights]
-    .reverse()
-    .find(
+  // Prefer the most recent night that actually has sleep duration — today's
+  // row may carry only a daily sleep score before Oura finalizes the detailed
+  // sleep (duration/HRV), which would otherwise show a half-empty hero.
+  const reversed = [...allNights].reverse();
+  const last =
+    reversed.find((n) => n.durationMin != null) ??
+    reversed.find(
       (n) =>
-        n.durationMin != null ||
         n.efficiencyPct != null ||
         n.hrvMs != null ||
+        n.sleepScore != null ||
         n.recoveryScore != null
-    ) ?? null;
+    ) ??
+    null;
 
   const meanOf = (vals: Array<number | null>): number | null => {
     const ns = vals.filter((v): v is number => v != null && Number.isFinite(v));
