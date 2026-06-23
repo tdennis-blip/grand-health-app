@@ -267,6 +267,17 @@ export default async function PatientSessionDetail({
                   </div>
                 </div>
 
+                {ex.videoUrl && (
+                  <a
+                    href={ex.videoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mb-2 inline-flex items-center gap-1.5 rounded-lg bg-violet-600 text-white text-[12px] font-semibold px-3 py-1.5 hover:bg-violet-700"
+                  >
+                    <Video size={13} /> Watch video{ex.videoLength ? ` · ${ex.videoLength}` : ""}
+                  </a>
+                )}
+
                 {ex.coachNote && (
                   <div className="text-[12px] text-slate-600 mb-2 leading-snug">
                     {ex.coachNote}
