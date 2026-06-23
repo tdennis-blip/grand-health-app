@@ -383,6 +383,7 @@ export const exerciseLibrary = pgTable(
     videoTitle: text("video_title"),
     videoLength: text("video_length"),
     videoUrl: text("video_url"),
+    perSide: boolean("per_side").default(false).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -454,6 +455,7 @@ export const sessionSets = pgTable(
     setNumber: integer("set_number").notNull(),
     reps: integer("reps").default(0).notNull(),
     weight: integer("weight").default(0).notNull(),
+    durationSeconds: integer("duration_seconds"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => ({
@@ -474,6 +476,8 @@ export const exerciseSetLogs = pgTable(
     logDate: date("log_date").notNull(),
     actualReps: integer("actual_reps"),
     actualWeight: integer("actual_weight"),
+    actualSeconds: integer("actual_seconds"),
+    side: text("side").default("na").notNull(), // 'na' | 'left' | 'right'
     done: boolean("done").default(true).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
@@ -481,7 +485,7 @@ export const exerciseSetLogs = pgTable(
   (t) => ({
     patientDateIdx: index("exercise_set_logs_patient_date_idx").on(t.patientId, t.logDate),
     sessionIdx: index("exercise_set_logs_session_idx").on(t.sessionId),
-    uniqPatientSetDate: unique("exercise_set_logs_patient_set_date_key").on(t.patientId, t.setId, t.logDate),
+    uniqPatientSetDateSide: unique("exercise_set_logs_patient_set_date_side_key").on(t.patientId, t.setId, t.logDate, t.side),
   })
 );
 

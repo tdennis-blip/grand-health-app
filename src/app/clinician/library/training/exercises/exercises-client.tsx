@@ -16,6 +16,7 @@ export type LibExercise = {
   videoLength: string | null;
   videoUrl: string | null;
   videoPublicId: string | null;
+  perSide: boolean;
 };
 
 export function ExercisesClient({ initial }: { initial: LibExercise[] }) {
@@ -41,6 +42,7 @@ export function ExercisesClient({ initial }: { initial: LibExercise[] }) {
               videoLength: "",
               videoUrl: "",
               videoPublicId: "",
+              perSide: false,
             })}
             className="text-xs font-semibold bg-teal-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-teal-800"
           >
@@ -152,6 +154,7 @@ function ExerciseDrawer({
     videoLength: ex.videoLength ?? "",
     videoUrl: ex.videoUrl ?? "",
     videoPublicId: ex.videoPublicId ?? "",
+    perSide: ex.perSide ?? false,
   });
   const valid = form.name.trim().length > 0;
   const isMobility = form.kind === "mobility";
@@ -195,6 +198,19 @@ function ExerciseDrawer({
           <Field label="Name" value={form.name} onChange={(v) => setForm((p) => ({ ...p, name: v }))} placeholder={isMobility ? "Cat–Cow" : "Barbell Bench Press"} />
           <Field label={isMobility ? "Primary area / joint" : "Primary area / muscle"} value={form.primaryArea ?? ""} onChange={(v) => setForm((p) => ({ ...p, primaryArea: v }))} placeholder={isMobility ? "T-spine" : "Chest"} />
           <FieldTextarea label="Coach note" value={form.coachNote ?? ""} onChange={(v) => setForm((p) => ({ ...p, coachNote: v }))} placeholder={isMobility ? "Slow segmental flexion + extension." : "Pause 1s on chest. RPE 8."} />
+
+          <label className="flex items-center gap-2.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={form.perSide}
+              onChange={(e) => setForm((p) => ({ ...p, perSide: e.target.checked }))}
+              className="w-4 h-4 accent-teal-700"
+            />
+            <span className="text-sm text-slate-700">
+              Per side (left / right)
+              <span className="block text-[11px] text-slate-500">Patient logs each set for left and right separately.</span>
+            </span>
+          </label>
 
           <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 space-y-3">
             <div className="flex items-center gap-2">

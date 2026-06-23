@@ -24,7 +24,7 @@ type Zone = {
   highBpm: number;
 };
 
-type AttachedSet = { id: string; setNumber: number; reps: number; weight: number };
+type AttachedSet = { id: string; setNumber: number; reps: number; weight: number; durationSeconds: number | null };
 type Attached = {
   id: string;
   sortOrder: number;
@@ -444,8 +444,9 @@ function AttachedExerciseRow({
       <div className="ml-8 space-y-1.5">
         <div className="grid grid-cols-12 gap-2 text-[10px] uppercase tracking-wide text-slate-500 font-semibold">
           <div className="col-span-2">{labels.round}</div>
-          <div className="col-span-4">{labels.reps}</div>
-          <div className="col-span-4">{labels.weight}</div>
+          <div className="col-span-3">{labels.reps}</div>
+          <div className="col-span-3">{labels.weight}</div>
+          <div className="col-span-2">Time (s)</div>
           <div className="col-span-2"></div>
         </div>
         {attached.sets.map((s) => (
@@ -474,9 +475,11 @@ function SetRow({
 }) {
   const [reps, setReps] = useState(set.reps);
   const [weight, setWeight] = useState(set.weight);
+  const [durationSeconds, setDurationSeconds] = useState<number | null>(set.durationSeconds);
   const [pending, startTransition] = useTransition();
 
-  const dirty = reps !== set.reps || weight !== set.weight;
+  const dirty = reps !== set.reps || weight !== set.weight || durationSeconds !== set.durationSeconds;
+  const save = () => dirty && startTransition(() => updateSet({ id: set.id, sessionId, reps, weight, durationSeconds }));
 
   return (
     <div className="grid grid-cols-12 gap-2 items-center">
@@ -485,15 +488,23 @@ function SetRow({
         type="number"
         value={reps}
         onChange={(e) => setReps(Number(e.target.value) || 0)}
-        onBlur={() => dirty && startTransition(() => updateSet({ id: set.id, sessionId, reps, weight }))}
-        className="col-span-4 text-sm text-slate-800 border border-slate-200 rounded-lg p-1.5 focus:outline-none focus:border-teal-500 bg-white tabular-nums"
+        onBlur={save}
+        className="col-span-3 text-sm text-slate-800 border border-slate-200 rounded-lg p-1.5 focus:outline-none focus:border-teal-500 bg-white tabular-nums"
       />
       <input
         type="number"
         value={weight}
         onChange={(e) => setWeight(Number(e.target.value) || 0)}
-        onBlur={() => dirty && startTransition(() => updateSet({ id: set.id, sessionId, reps, weight }))}
-        className="col-span-4 text-sm text-slate-800 border border-slate-200 rounded-lg p-1.5 focus:outline-none focus:border-teal-500 bg-white tabular-nums"
+        onBlur={save}
+        className="col-span-3 text-sm text-slate-800 border border-slate-200 rounded-lg p-1.5 focus:outline-none focus:border-teal-500 bg-white tabular-nums"
+      />
+      <input
+        type="number"
+        value={durationSeconds ?? ""}
+        placeholder="—"
+        onChange={(e) => setDurationSeconds(e.target.value === "" ? null : Math.max(0, Number(e.target.value) || 0))}
+        onBlur={save}
+        className="col-span-2 text-sm text-slate-800 border border-slate-200 rounded-lg p-1.5 focus:outline-none focus:border-teal-500 bg-white tabular-nums"
       />
       <button
         onClick={() => startTransition(() => removeSet({ id: set.id, sessionId }))}

@@ -132,7 +132,8 @@ export type SessionDetail = {
     videoTitle: string | null;
     videoLength: string | null;
     videoUrl: string | null;
-    sets: Array<{ id: string; setNumber: number; reps: number; weight: number }>;
+    perSide: boolean;
+    sets: Array<{ id: string; setNumber: number; reps: number; weight: number; durationSeconds: number | null }>;
   }>;
 };
 
@@ -164,7 +165,7 @@ export async function getSessionDetail(sessionId: string): Promise<SessionDetail
     sql`
       SELECT se.id, se.sort_order, se.exercise_id,
              e.name AS exercise_name, e.primary_area, e.coach_note AS exercise_coach_note,
-             e.video_title, e.video_length, e.video_url
+             e.video_title, e.video_length, e.video_url, e.per_side
       FROM session_exercises se
       JOIN exercise_library e ON e.id = se.exercise_id
       WHERE se.session_id = ${sessionId}
@@ -175,7 +176,7 @@ export async function getSessionDetail(sessionId: string): Promise<SessionDetail
   const seIds = exercises.map((e: any) => e.id as string);
   const sets = seIds.length > 0
     ? await withAuth(user, (sql) =>
-        sql`SELECT id, session_exercise_id, set_number, reps, weight FROM session_sets WHERE session_exercise_id = ANY(${seIds}) ORDER BY set_number ASC`
+        sql`SELECT id, session_exercise_id, set_number, reps, weight, duration_seconds FROM session_sets WHERE session_exercise_id = ANY(${seIds}) ORDER BY set_number ASC`
       )
     : [];
 
@@ -214,8 +215,10 @@ export async function getSessionDetail(sessionId: string): Promise<SessionDetail
       videoTitle: se.video_title ?? null,
       videoLength: se.video_length ?? null,
       videoUrl: se.video_url ?? null,
+      perSide: se.per_side ?? false,
       sets: (setsByExercise[se.id] ?? []).map((set: any) => ({
         id: set.id, setNumber: set.set_number, reps: set.reps, weight: set.weight,
+        durationSeconds: set.duration_seconds ?? null,
       })),
     })),
   };
@@ -223,12 +226,15 @@ export async function getSessionDetail(sessionId: string): Promise<SessionDetail
 
 export type SetLog = {
   setId: string;
+  side: string; // 'na' | 'left' | 'right'
   actualReps: number | null;
   actualWeight: number | null;
+  actualSeconds: number | null;
   done: boolean;
 };
 
-// Patient's logged actuals for a session on a given date, keyed by set id.
+// Patient's logged actuals for a session on a given date, keyed by
+// `${setId}:${side}` so per-side (left/right) logs are addressable.
 export async function getSetLogsForSession(
   sessionId: string,
   logDate: string
@@ -236,16 +242,18 @@ export async function getSetLogsForSession(
   const user = await getUser();
   if (!user) return {};
   const rows = await withAuth(user, (sql) =>
-    sql`SELECT set_id, actual_reps, actual_weight, done
+    sql`SELECT set_id, side, actual_reps, actual_weight, actual_seconds, done
         FROM exercise_set_logs
         WHERE patient_id = ${user.id} AND session_id = ${sessionId} AND log_date = ${logDate}`
   );
   const map: Record<string, SetLog> = {};
   rows.forEach((r: any) => {
-    map[r.set_id] = {
+    map[`${r.set_id}:${r.side}`] = {
       setId: r.set_id,
+      side: r.side,
       actualReps: r.actual_reps,
       actualWeight: r.actual_weight,
+      actualSeconds: r.actual_seconds,
       done: r.done,
     };
   });

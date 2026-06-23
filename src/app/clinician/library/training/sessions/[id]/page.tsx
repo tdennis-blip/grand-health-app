@@ -33,7 +33,7 @@ export default async function SessionEditPage({ params }: { params: Promise<{ id
         sql`SELECT id, name, primary_area FROM exercise_library WHERE kind = ${kind} ORDER BY name ASC`
       ),
       withAuth(user, (sql) =>
-        sql`SELECT ss.id, ss.session_exercise_id, ss.set_number, ss.reps, ss.weight FROM session_sets ss JOIN session_exercises se ON se.id = ss.session_exercise_id WHERE se.session_id = ${id} ORDER BY ss.set_number ASC`
+        sql`SELECT ss.id, ss.session_exercise_id, ss.set_number, ss.reps, ss.weight, ss.duration_seconds FROM session_sets ss JOIN session_exercises se ON se.id = ss.session_exercise_id WHERE se.session_id = ${id} ORDER BY ss.set_number ASC`
       ),
     ]);
     const setsByEx: Record<string, any[]> = {};
@@ -45,7 +45,7 @@ export default async function SessionEditPage({ params }: { params: Promise<{ id
       exerciseName: se.ex_name ?? "(unknown)",
       primaryArea: se.primary_area ?? null,
       videoTitle: se.video_title ?? null,
-      sets: (setsByEx[se.id] ?? []).map((s: any) => ({ id: s.id, setNumber: s.set_number, reps: s.reps, weight: s.weight })),
+      sets: (setsByEx[se.id] ?? []).map((s: any) => ({ id: s.id, setNumber: s.set_number, reps: s.reps, weight: s.weight, durationSeconds: s.duration_seconds ?? null })),
     }));
     exerciseLibrary = libRows.map((e: any) => ({ id: e.id, name: e.name, primaryArea: e.primary_area }));
   }

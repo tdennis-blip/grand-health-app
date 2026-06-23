@@ -291,6 +291,7 @@ export default async function PatientSessionDetail({
                 {ex.sets.length > 0 && (
                   <SetLogger
                     kind={session.kind === "mobility" ? "mobility" : "strength"}
+                    perSide={ex.perSide}
                     sessionId={session.id}
                     day={day}
                     logDate={logDate}

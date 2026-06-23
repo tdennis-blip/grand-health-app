@@ -152,11 +152,11 @@ export async function addSet(args: { sessionExerciseId: string; sessionId: strin
   const user = await requireClinician();
 
   const [last] = await withAuth(user, (sql) =>
-    sql`SELECT set_number, reps, weight FROM session_sets WHERE session_exercise_id = ${args.sessionExerciseId} ORDER BY set_number DESC LIMIT 1`
+    sql`SELECT set_number, reps, weight, duration_seconds FROM session_sets WHERE session_exercise_id = ${args.sessionExerciseId} ORDER BY set_number DESC LIMIT 1`
   );
   const nextNumber = (last?.set_number ?? 0) + 1;
   await withAuth(user, (sql) =>
-    sql`INSERT INTO session_sets (session_exercise_id, set_number, reps, weight) VALUES (${args.sessionExerciseId}, ${nextNumber}, ${last?.reps ?? 10}, ${last?.weight ?? 0})`
+    sql`INSERT INTO session_sets (session_exercise_id, set_number, reps, weight, duration_seconds) VALUES (${args.sessionExerciseId}, ${nextNumber}, ${last?.reps ?? 10}, ${last?.weight ?? 0}, ${last?.duration_seconds ?? null})`
   );
   revalidateSession(args.sessionId);
 }
@@ -167,8 +167,8 @@ export async function removeSet(args: { id: string; sessionId: string }) {
   revalidateSession(args.sessionId);
 }
 
-export async function updateSet(args: { id: string; sessionId: string; reps: number; weight: number }) {
+export async function updateSet(args: { id: string; sessionId: string; reps: number; weight: number; durationSeconds?: number | null }) {
   const user = await requireClinician();
-  await withAuth(user, (sql) => sql`UPDATE session_sets SET reps = ${args.reps}, weight = ${args.weight} WHERE id = ${args.id}`);
+  await withAuth(user, (sql) => sql`UPDATE session_sets SET reps = ${args.reps}, weight = ${args.weight}, duration_seconds = ${args.durationSeconds ?? null} WHERE id = ${args.id}`);
   revalidateSession(args.sessionId);
 }

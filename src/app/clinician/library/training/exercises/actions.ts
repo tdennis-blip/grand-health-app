@@ -18,6 +18,7 @@ const exerciseSchema = z.object({
   videoLength: z.string().max(50).nullish(),
   videoUrl: z.string().max(2000).nullish(),
   videoPublicId: z.string().max(500).nullish(),
+  perSide: z.boolean().default(false),
 });
 
 const revalidateAll = () => revalidatePath("/clinician/library/training/exercises");
@@ -27,7 +28,7 @@ export async function createExercise(input: z.infer<typeof exerciseSchema>) {
   const user = await requireClinician();
 
   const [inserted] = await withAuth(user, (sql) =>
-    sql`INSERT INTO exercise_library (clinic_id, kind, name, primary_area, coach_note, video_title, video_length, video_url, video_public_id) VALUES (${user.clinicId}, ${parsed.kind}, ${parsed.name}, ${parsed.primaryArea ?? null}, ${parsed.coachNote ?? null}, ${parsed.videoTitle ?? null}, ${parsed.videoLength ?? null}, ${parsed.videoUrl ?? null}, ${parsed.videoPublicId ?? null}) RETURNING id`
+    sql`INSERT INTO exercise_library (clinic_id, kind, name, primary_area, coach_note, video_title, video_length, video_url, video_public_id, per_side) VALUES (${user.clinicId}, ${parsed.kind}, ${parsed.name}, ${parsed.primaryArea ?? null}, ${parsed.coachNote ?? null}, ${parsed.videoTitle ?? null}, ${parsed.videoLength ?? null}, ${parsed.videoUrl ?? null}, ${parsed.videoPublicId ?? null}, ${parsed.perSide}) RETURNING id`
   );
   if (!inserted) throw new Error("Insert failed");
 
@@ -45,7 +46,7 @@ export async function updateExercise(input: z.infer<typeof exerciseSchema> & { i
   );
 
   await withAuth(user, (sql) =>
-    sql`UPDATE exercise_library SET kind = ${parsed.kind}, name = ${parsed.name}, primary_area = ${parsed.primaryArea ?? null}, coach_note = ${parsed.coachNote ?? null}, video_title = ${parsed.videoTitle ?? null}, video_length = ${parsed.videoLength ?? null}, video_url = ${parsed.videoUrl ?? null}, video_public_id = ${parsed.videoPublicId ?? null}, updated_at = ${new Date().toISOString()} WHERE id = ${parsed.id}`
+    sql`UPDATE exercise_library SET kind = ${parsed.kind}, name = ${parsed.name}, primary_area = ${parsed.primaryArea ?? null}, coach_note = ${parsed.coachNote ?? null}, video_title = ${parsed.videoTitle ?? null}, video_length = ${parsed.videoLength ?? null}, video_url = ${parsed.videoUrl ?? null}, video_public_id = ${parsed.videoPublicId ?? null}, per_side = ${parsed.perSide}, updated_at = ${new Date().toISOString()} WHERE id = ${parsed.id}`
   );
 
   await recordAudit({ action: "update", entityType: "exercise_library", entityId: parsed.id, meta: { before } });

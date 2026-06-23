@@ -6,7 +6,7 @@ import { ExercisesClient } from "./exercises-client";
 export default async function ExercisesPage() {
   const user = await requireClinician();
   const data = await withAuth(user, (sql) =>
-    sql`SELECT id, kind, name, primary_area, coach_note, video_title, video_length, video_url, video_public_id FROM exercise_library ORDER BY kind ASC, name ASC`
+    sql`SELECT id, kind, name, primary_area, coach_note, video_title, video_length, video_url, video_public_id, per_side FROM exercise_library ORDER BY kind ASC, name ASC`
   );
 
   return (
@@ -33,6 +33,7 @@ export default async function ExercisesPage() {
           videoLength: e.video_length,
           videoUrl: e.video_url,
           videoPublicId: e.video_public_id,
+          perSide: e.per_side ?? false,
         }))}
       />
     </main>

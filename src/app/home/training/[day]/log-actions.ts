@@ -11,8 +11,10 @@ const logSetSchema = z.object({
   setId: z.string().uuid(),
   day: z.string().min(1).max(8),
   logDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  side: z.enum(["na", "left", "right"]).default("na"),
   actualReps: z.number().int().min(0).max(100000).nullable(),
   actualWeight: z.number().int().min(0).max(100000).nullable(),
+  actualSeconds: z.number().int().min(0).max(100000).nullable().default(null),
   done: z.boolean(),
 });
 
@@ -24,13 +26,14 @@ export async function logSet(input: z.infer<typeof logSetSchema>) {
   await withAuth(user, (sql) =>
     sql`
       INSERT INTO exercise_set_logs
-        (clinic_id, patient_id, session_id, set_id, log_date, actual_reps, actual_weight, done)
+        (clinic_id, patient_id, session_id, set_id, log_date, side, actual_reps, actual_weight, actual_seconds, done)
       VALUES
-        (${user.clinicId}, ${user.id}, ${parsed.sessionId}, ${parsed.setId}, ${parsed.logDate},
-         ${parsed.actualReps}, ${parsed.actualWeight}, ${parsed.done})
-      ON CONFLICT (patient_id, set_id, log_date) DO UPDATE SET
+        (${user.clinicId}, ${user.id}, ${parsed.sessionId}, ${parsed.setId}, ${parsed.logDate}, ${parsed.side},
+         ${parsed.actualReps}, ${parsed.actualWeight}, ${parsed.actualSeconds}, ${parsed.done})
+      ON CONFLICT (patient_id, set_id, log_date, side) DO UPDATE SET
         actual_reps = EXCLUDED.actual_reps,
         actual_weight = EXCLUDED.actual_weight,
+        actual_seconds = EXCLUDED.actual_seconds,
         done = EXCLUDED.done,
         updated_at = now()
     `
