@@ -218,6 +218,21 @@ export default async function PatientSessionDetail({
         </section>
       )}
 
+      {/* VO2 max logging */}
+      {session.kind === "vo2max" && (
+        <CardioLogger
+          sessionId={session.id}
+          day={day}
+          logDate={logDate}
+          prescribedMinutes={
+            (session.warmupMin ?? 0) +
+              (session.rounds ?? 0) * ((session.workMin ?? 0) + (session.recoverMin ?? 0)) +
+              (session.cooldownMin ?? 0) || session.estMinutes
+          }
+          initial={cardioLog}
+        />
+      )}
+
       {/* Strength / mobility body */}
       {(session.kind === "strength" || session.kind === "mobility") && (
         <section className="space-y-2">
