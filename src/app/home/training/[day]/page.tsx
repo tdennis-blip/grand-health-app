@@ -268,14 +268,18 @@ export default async function PatientSessionDetail({
                 </div>
 
                 {ex.videoUrl && (
-                  <a
-                    href={ex.videoUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mb-2 inline-flex items-center gap-1.5 rounded-lg bg-violet-600 text-white text-[12px] font-semibold px-3 py-1.5 hover:bg-violet-700"
-                  >
-                    <Video size={13} /> Watch video{ex.videoLength ? ` · ${ex.videoLength}` : ""}
-                  </a>
+                  <div className="mb-2">
+                    <div className="text-[10px] uppercase tracking-wide text-violet-700 font-semibold mb-1 flex items-center gap-1">
+                      <Video size={11} /> Demo{ex.videoLength ? ` · ${ex.videoLength}` : ""}
+                    </div>
+                    <video
+                      controls
+                      preload="none"
+                      playsInline
+                      className="w-full rounded-xl bg-black max-h-72"
+                      src={ex.videoUrl}
+                    />
+                  </div>
                 )}
 
                 {ex.coachNote && (
