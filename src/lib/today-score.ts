@@ -16,7 +16,7 @@
 // for scoping (the helpers below already do that).
 import { getUser } from "@/lib/auth/server";
 import { getMyDietTargets, getRecentFoodLogs } from "@/lib/diet";
-import { getActiveAssignment, getWeekSchedule, todayKey } from "@/lib/training";
+import { getActiveAssignment, getWeekSchedule, todayKey, getTrainingComplianceScore } from "@/lib/training";
 import { getRecentMetrics, pickPrimary, type DailyMetricRow } from "@/lib/wearables/queries";
 import type { DietTargets } from "@/lib/diet";
 
@@ -67,7 +67,10 @@ export async function getTodayScore(): Promise<TodayScore> {
 
   const diet = scoreDiet(todayLog, dietTargetsRes.targets);
   const sleep = scoreSleep(todayMetric, wearableMetrics);
-  const training = scoreTraining(todaySession);
+  // Training compliance: % of today's prescribed work actually logged done.
+  const training = await getTrainingComplianceScore(
+    assignment ? todaySession?.sessions ?? [] : null
+  );
 
   // 7-day history: per-day overall score using whatever data we have.
   const history = buildHistory(foodLogs, wearableMetrics, dietTargetsRes.targets);
@@ -152,29 +155,6 @@ function scoreSleep(
       ? Math.round(clamp01(dur / (8 * 60)) * 100)
       : null;
   return { value, caption: captionBits.join(" · ") || "Last night" };
-}
-
-function scoreTraining(
-  todaySession:
-    | { sessions: { name: string; estMinutes: number }[]; day: string }
-    | undefined
-): DomainScore {
-  // No completion tracking yet — we score boolean: scheduled vs rest. A
-  // "rest day" counts as on-target (it's a deliberate part of the plan),
-  // so it scores 100. A scheduled day with no completion logged gets a
-  // neutral 50 to keep the overall mean honest.
-  if (!todaySession) {
-    return { value: null, caption: "No program assigned" };
-  }
-  const sessions = todaySession.sessions ?? [];
-  if (sessions.length === 0) {
-    return { value: 100, caption: "Rest day — recovery is part of the plan", ok: true };
-  }
-  if (sessions.length === 1) {
-    return { value: 50, caption: `${sessions[0].name} · ~${sessions[0].estMinutes}m` };
-  }
-  const totalMin = sessions.reduce((sum, s) => sum + s.estMinutes, 0);
-  return { value: 50, caption: `${sessions.length} sessions · ~${totalMin}m` };
 }
 
 // ---------------------------------------------------------------------------

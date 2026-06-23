@@ -4,6 +4,7 @@
 // programs the patient has been assigned.
 
 import { getUser } from "@/lib/auth/server";
+import type { AuthUser } from "@/lib/auth/server";
 import { withAuth } from "@/lib/db/connection";
 
 export type DayKey = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
@@ -249,6 +250,64 @@ export async function getSetLogsForSession(
     };
   });
   return map;
+}
+
+// ---------------------------------------------------------------------------
+// Today's training compliance score (drives the Home hero "Training" domain).
+//   · Rest day (no sessions)        → 100
+//   · Strength / mobility session   → % of prescribed sets marked done
+//   · Zone 2 / VO2 max session      → done = 100, not done = 0
+//   · Multiple sessions in a day    → average of the per-session scores
+//   · No program assigned           → null (not scored)
+// ---------------------------------------------------------------------------
+async function sessionCompletionFraction(
+  user: AuthUser,
+  session: WeekSessionLite,
+  logDate: string
+): Promise<number> {
+  if (session.kind === "zone2" || session.kind === "vo2max") {
+    const [row] = await withAuth(user, (sql) =>
+      sql`SELECT done FROM cardio_session_logs
+          WHERE patient_id = ${user.id} AND session_id = ${session.id} AND log_date = ${logDate}
+          LIMIT 1`
+    );
+    return row?.done ? 1 : 0;
+  }
+  // strength / mobility — fraction of prescribed sets logged done.
+  const [counts] = await withAuth(user, (sql) =>
+    sql`
+      SELECT
+        (SELECT count(*)::int FROM session_sets ss
+           JOIN session_exercises se ON se.id = ss.session_exercise_id
+          WHERE se.session_id = ${session.id}) AS total,
+        (SELECT count(*)::int FROM exercise_set_logs
+          WHERE patient_id = ${user.id} AND session_id = ${session.id}
+            AND log_date = ${logDate} AND done = true) AS done
+    `
+  );
+  const total = Number(counts?.total ?? 0);
+  const done = Number(counts?.done ?? 0);
+  return total > 0 ? Math.min(1, done / total) : 0;
+}
+
+export async function getTrainingComplianceScore(
+  sessions: WeekSessionLite[] | null
+): Promise<{ value: number | null; caption: string; ok?: boolean }> {
+  if (sessions == null) return { value: null, caption: "No program assigned" };
+  if (sessions.length === 0) {
+    return { value: 100, caption: "Rest day — recovery is part of the plan", ok: true };
+  }
+  const user = await getUser();
+  if (!user) return { value: null, caption: "Sign in to score training" };
+
+  const logDate = new Date().toISOString().slice(0, 10);
+  let sum = 0;
+  for (const s of sessions) {
+    sum += await sessionCompletionFraction(user, s, logDate);
+  }
+  const value = Math.round((sum / sessions.length) * 100);
+  const label = sessions.length === 1 ? sessions[0].name : `${sessions.length} sessions`;
+  return { value, caption: `${label} · ${value}% complete`, ok: value >= 100 };
 }
 
 export type CardioLog = { actualMinutes: number | null; done: boolean };
