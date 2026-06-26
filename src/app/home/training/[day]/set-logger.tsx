@@ -79,12 +79,12 @@ export function SetLogger({
   };
 
   const update = (setId: string, side: Side, patch: Partial<RowState>, save: boolean) => {
-    setRows((p) => {
-      const next = { ...p[keyOf(setId, side)], ...patch, saved: false };
-      const merged = { ...p, [keyOf(setId, side)]: next };
-      if (save) persist(setId, side, next);
-      return merged;
-    });
+    const k = keyOf(setId, side);
+    const next = { ...rows[k], ...patch, saved: false };
+    setRows((p) => ({ ...p, [k]: next }));
+    // Persist OUTSIDE the state updater — calling persist (which sets state)
+    // inside setRows throws a client-side React error.
+    if (save) persist(setId, side, next);
   };
 
   return (

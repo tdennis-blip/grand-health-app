@@ -58,6 +58,49 @@ Without them, the Oura backfill/sync upsert (which writes active_kcal/total_kcal
 
 ---
 
+## 📋 Session log 2026-06-23 — wearables live, training logging, hero rework, exercise builder
+
+Big session. All shipped to staging unless noted. Migrations 0020–0023 all applied on staging.
+
+**Oura is LIVE.** Dev app registered (redirect `https://staging.mygrandhealth.com/api/wearables/oura/callback`); `OURA_CLIENT_ID/SECRET/WEBHOOK_SECRET` set in `grand-health/staging/app-env` and wired into the ECS task def (`infra/lib/app-runtime.ts` `secrets` map — see the GOTCHA below; the `secretObjectValue` edit caused a full outage, recovered via AWSPREVIOUS restore). Patient connect flow works; 14-day backfill + daily cron + on-app-open refresh (`/api/wearables/refresh`, rate-limited 30 min, fired by `home/wearable-refresh.tsx`).
+
+**Oura data fields:** active calories (`active_kcal`), bedtime/wake (`bedtime_start/end`, shown on Sleep hero via `formatClockTime`), nightly sleep score (from the **daily_sleep** endpoint — must call it; the detailed `sleep` endpoint has duration/efficiency/HRV but NOT score). Whoop only gives total kJ → `total_kcal`, no active-only.
+
+**Sleep page:** hero shows Sleep time + HRV + Sleep score; 30-day trends = duration, HRV, sleep score. "Last night" picks the most recent night with *duration* (today often has only a score before Oura finalizes).
+
+**Calories burned card** on Today home (only when a device measured `active_kcal`). Dynamic-mode diet plans credit active kcal into the goal (0020 work).
+
+**Hero "Path to Longevity" rework** (`lib/today-score.ts`): overall = mean of available domains.
+- Diet = kcal + protein vs target (capped). FIXED a bug where it always showed 0 (food_logs.log_date came back as a Date object; cast `::text`).
+- Sleep = Oura sleep score (fallback duration/8h).
+- Training = **compliance** (`getTrainingComplianceScore` in training.ts): rest day 100; strength/mobility = % of sets logged done; zone2/vo2max = done?100:0; multiple sessions averaged.
+
+**⚠️ Recurring gotcha fixed everywhere now:** postgres-js returns `date` columns as JS Date objects, breaking string compares/sorts. Cast `::text` in queries (done for metric_date, food_logs.log_date). If a new `date`-column read misbehaves, that's the cause.
+
+**Training logging:**
+- Strength/mobility per-set logging already existed (reps/weight/done, `exercise_set_logs`).
+- **Zone 2 + VO₂ max** session logging added (`cardio_session_logs`, migration 0022): Mark complete + actual minutes, on the day page (`cardio-logger.tsx`).
+- **Per-set time + countdown timer** (migration 0023 `session_sets.duration_seconds`): clinician adds it in the session set editor ("Time (s)" column). Patient sees a Start/Pause/Reset countdown + "Actual (s)" field (prefilled full).
+- **Left/Right (unilateral)** (migration 0023 `exercise_library.per_side` + `exercise_set_logs.side` 'na'/'left'/'right' with new unique key incl. side): toggle on the Exercises library editor; patient logs Left + Right rows separately. `actual_seconds` added to set logs too.
+
+**Other fixes shipped:**
+- USDA food search 429 → replaced `DEMO_KEY` with a real `USDA_API_KEY` in the secret.
+- OAuth post-callback redirect went to the internal ECS host → all wearable redirects now use `NEXT_PUBLIC_SITE_URL` / forwarded host, not `req.url` (`wearables/[provider]/{start,callback}`).
+- Patient weight entry couldn't reach 3 digits → `WeightInput` keeps typed value, no lossy kg↔lb round-trip per keystroke (`profile-editor.tsx`).
+- Patient stack now shows prescribed meds even without a dose schedule.
+- Exercise **video plays inline** (`<video controls preload=none playsInline>`) on the patient day page.
+- **Login**: already-authenticated (`UserAlreadyAuthenticatedException`) now treated as success + full nav to `/` so middleware routes to role home.
+
+**⏳ OPEN / NEXT TIME:**
+- Decide if exercise **duration** should also be settable on the Exercises library tab as a default (currently per-set only, in the session builder). User was looking for it there.
+- Clinician "View logged workouts" page doesn't yet show per-side (L/R), actual seconds, or cardio logs — only strength reps/weight. Consider surfacing cardio + per-side + times.
+- VO₂ max logger is wired; could add to hero history bars (training not in 7-day history strip yet).
+- **GitHub Actions doesn't auto-trigger on push** — having to "Run workflow" manually each time. Investigate (Actions enabled? permissions?). Also: deploys race with manual `force-new-deployment` → circuit-breaker rollback; run one at a time.
+- `ANTHROPIC_API_KEY` still REPLACE_ME (diet AI generator disabled).
+- Repo still in iCloud → `index.lock` friction + triple-nested `grand-health-app/grand-health-app/...` stale copies that throw phantom tsc errors. Move to `~/dev`.
+
+---
+
 ## ⚠️ GOTCHA: never edit `secretObjectValue` in infra/lib/app-runtime.ts on a live env
 
 2026-06-22 staging outage: adding keys to the `secretObjectValue` map (to wire Oura) changed that CFN property, so the next `cdk deploy` **overwrote the entire `grand-health/staging/app-env` secret back to REPLACE_ME defaults** — wiping DATABASE_URL etc. Symptom: every page 500s with `TypeError: Invalid URL, input: 'REPLACE_ME'` (postgres-js can't parse "REPLACE_ME"). Fix used: restore the prior secret version + roll the service:
