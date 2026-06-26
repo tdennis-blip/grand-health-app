@@ -1336,7 +1336,7 @@
    "Type": "AWS::SecretsManager::Secret",
    "Properties": {
     "Name": "grand-health/staging/app-env",
-    "SecretString": "{\"DATABASE_URL\":\"REPLACE_ME\",\"SERVICE_ROLE_DATABASE_URL\":\"REPLACE_ME\",\"USDA_API_KEY\":\"REPLACE_ME\",\"ANTHROPIC_API_KEY\":\"REPLACE_ME\",\"CLOUDINARY_CLOUD_NAME\":\"REPLACE_ME\",\"CLOUDINARY_API_KEY\":\"REPLACE_ME\",\"CLOUDINARY_API_SECRET\":\"REPLACE_ME\"}",
+    "SecretString": "{\"DATABASE_URL\":\"REPLACE_ME\",\"SERVICE_ROLE_DATABASE_URL\":\"REPLACE_ME\",\"USDA_API_KEY\":\"REPLACE_ME\",\"ANTHROPIC_API_KEY\":\"REPLACE_ME\",\"CLOUDINARY_CLOUD_NAME\":\"REPLACE_ME\",\"CLOUDINARY_API_KEY\":\"REPLACE_ME\",\"CLOUDINARY_API_SECRET\":\"REPLACE_ME\",\"OURA_CLIENT_ID\":\"REPLACE_ME\",\"OURA_CLIENT_SECRET\":\"REPLACE_ME\",\"OURA_WEBHOOK_SECRET\":\"REPLACE_ME\"}",
     "Tags": [
      {
       "Key": "PHI",
@@ -2052,6 +2052,48 @@
             "Ref": "AppRuntimeAppEnv759C410D"
            },
            ":CLOUDINARY_API_SECRET::"
+          ]
+         ]
+        }
+       },
+       {
+        "Name": "OURA_CLIENT_ID",
+        "ValueFrom": {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Ref": "AppRuntimeAppEnv759C410D"
+           },
+           ":OURA_CLIENT_ID::"
+          ]
+         ]
+        }
+       },
+       {
+        "Name": "OURA_CLIENT_SECRET",
+        "ValueFrom": {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Ref": "AppRuntimeAppEnv759C410D"
+           },
+           ":OURA_CLIENT_SECRET::"
+          ]
+         ]
+        }
+       },
+       {
+        "Name": "OURA_WEBHOOK_SECRET",
+        "ValueFrom": {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Ref": "AppRuntimeAppEnv759C410D"
+           },
+           ":OURA_WEBHOOK_SECRET::"
           ]
          ]
         }

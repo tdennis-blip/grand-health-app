@@ -244,6 +244,21 @@ export class AppRuntime extends Construct {
       timeout: cdk.Duration.seconds(10),
     });
 
+    // Let the app provision Cognito users (clinician "Add patient/staff" flow).
+    service.taskDefinition.taskRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        actions: [
+          "cognito-idp:AdminCreateUser",
+          "cognito-idp:AdminGetUser",
+          "cognito-idp:AdminSetUserPassword",
+          "cognito-idp:AdminUpdateUserAttributes",
+        ],
+        resources: [
+          `arn:aws:cognito-idp:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:userpool/us-east-1_Yk5gVyw4D`,
+        ],
+      })
+    );
+
     new cdk.CfnOutput(this, "AlbUrl", {
       value: domainName
         ? `https://${domainName}`

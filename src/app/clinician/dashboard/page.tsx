@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { requireClinician } from "@/lib/auth/server";
 import { withAuth } from "@/lib/db/connection";
+import { AddUserButton } from "./add-user";
 
 type RosterRow = {
   profile_id: string;
@@ -36,11 +37,14 @@ export default async function ClinicianDashboard() {
 
   return (
     <main className="max-w-6xl mx-auto px-6 py-6 space-y-5">
-      <div>
-        <div className="text-xs uppercase tracking-wide text-slate-500">My panel</div>
-        <div className="text-xl font-semibold text-slate-900">
-          Patients ({rows.length})
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-xs uppercase tracking-wide text-slate-500">My panel</div>
+          <div className="text-xl font-semibold text-slate-900">
+            Patients ({rows.length})
+          </div>
         </div>
+        <AddUserButton />
       </div>
 
       {error && (
@@ -53,8 +57,8 @@ export default async function ClinicianDashboard() {
         <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-10 text-center">
           <div className="text-sm font-semibold text-slate-900">No patients yet</div>
           <div className="text-xs text-slate-500 mt-1">
-            Invite patients from the Supabase dashboard for now — the in-app
-            invite flow comes in the next round.
+            Use &ldquo;Add patient&rdquo; above to create an account — they&apos;ll get a
+            temporary password by email to finish signing in.
           </div>
         </div>
       ) : (

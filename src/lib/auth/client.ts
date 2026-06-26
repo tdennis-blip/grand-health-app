@@ -3,6 +3,7 @@
 import {
   signIn as amplifySignIn,
   signOut as amplifySignOut,
+  confirmSignIn as amplifyConfirmSignIn,
   fetchAuthSession,
   type SignInInput,
 } from "aws-amplify/auth";
@@ -50,6 +51,11 @@ export async function getIdToken(): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+// Completes the first-login "new password required" challenge.
+export async function confirmNewPassword(newPassword: string) {
+  return amplifyConfirmSignIn({ challengeResponse: newPassword });
 }
 
 export async function signOut() {
