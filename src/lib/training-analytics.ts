@@ -33,7 +33,7 @@ export async function getWeeklyCardioMinutes(
     sql`
       SELECT week_start, kind, sum(minutes)::int AS minutes FROM (
         SELECT to_char(date_trunc('week', csl.log_date), 'YYYY-MM-DD') AS week_start,
-               s.kind AS kind, coalesce(csl.actual_minutes, 0) AS minutes
+               s.kind::text AS kind, coalesce(csl.actual_minutes, 0) AS minutes
         FROM cardio_session_logs csl
         JOIN session_library s ON s.id = csl.session_id
         WHERE csl.patient_id = ${patientId} AND csl.done = true
