@@ -340,21 +340,14 @@ export async function getTrainingComplianceScore(
 
 export type PatientActivity = {
   id: string;
+  logDate: string;
   kind: "zone2" | "vo2max" | "cardio" | "strength" | "mobility";
   name: string;
   minutes: number | null;
   sets: Array<{ setNumber: number; reps: number | null; weight: number | null; durationSeconds: number | null }>;
 };
 
-// The patient's own ad-hoc activities logged for a date.
-export async function getPatientActivitiesForDate(logDate: string): Promise<PatientActivity[]> {
-  const user = await getUser();
-  if (!user) return [];
-  const acts = await withAuth(user, (sql) =>
-    sql`SELECT id, kind, name, minutes FROM patient_activities
-        WHERE patient_id = ${user.id} AND log_date = ${logDate}
-        ORDER BY created_at ASC`
-  );
+async function hydrateActivities(user: AuthUser, acts: any[]): Promise<PatientActivity[]> {
   if (acts.length === 0) return [];
   const ids = acts.map((a: any) => a.id as string);
   const sets = await withAuth(user, (sql) =>
@@ -365,6 +358,7 @@ export async function getPatientActivitiesForDate(logDate: string): Promise<Pati
   sets.forEach((s: any) => (byActivity[s.activity_id] ?? (byActivity[s.activity_id] = [])).push(s));
   return acts.map((a: any) => ({
     id: a.id,
+    logDate: a.log_date,
     kind: a.kind,
     name: a.name,
     minutes: a.minutes,
@@ -375,6 +369,33 @@ export async function getPatientActivitiesForDate(logDate: string): Promise<Pati
       durationSeconds: s.duration_seconds,
     })),
   }));
+}
+
+// The patient's own ad-hoc activities logged for a date.
+export async function getPatientActivitiesForDate(logDate: string): Promise<PatientActivity[]> {
+  const user = await getUser();
+  if (!user) return [];
+  const acts = await withAuth(user, (sql) =>
+    sql`SELECT id, log_date::text AS log_date, kind, name, minutes FROM patient_activities
+        WHERE patient_id = ${user.id} AND log_date = ${logDate}
+        ORDER BY created_at ASC`
+  );
+  return hydrateActivities(user, acts);
+}
+
+// The patient's recent ad-hoc activities across the last N days (newest first).
+export async function getRecentPatientActivities(days = 14): Promise<PatientActivity[]> {
+  const user = await getUser();
+  if (!user) return [];
+  const since = new Date();
+  since.setUTCDate(since.getUTCDate() - (days - 1));
+  const sinceIso = since.toISOString().slice(0, 10);
+  const acts = await withAuth(user, (sql) =>
+    sql`SELECT id, log_date::text AS log_date, kind, name, minutes FROM patient_activities
+        WHERE patient_id = ${user.id} AND log_date >= ${sinceIso}
+        ORDER BY log_date DESC, created_at DESC`
+  );
+  return hydrateActivities(user, acts);
 }
 
 export type CardioLog = { actualMinutes: number | null; done: boolean };

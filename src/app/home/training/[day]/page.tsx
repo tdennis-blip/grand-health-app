@@ -56,6 +56,7 @@ export default async function PatientSessionDetail({
             Your clinician hasn&apos;t assigned a program. Check back after your next visit.
           </div>
         </div>
+        <ActivityLogger day={day} logDate={todayIso()} activities={await getPatientActivitiesForDate(todayIso())} />
       </main>
     );
   }
@@ -120,6 +121,7 @@ export default async function PatientSessionDetail({
             );
           })}
         </div>
+        <ActivityLogger day={day} logDate={todayIso()} activities={await getPatientActivitiesForDate(todayIso())} />
       </main>
     );
   }

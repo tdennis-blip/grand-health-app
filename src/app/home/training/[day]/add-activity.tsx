@@ -7,6 +7,7 @@ import { addPatientActivity, deletePatientActivity } from "./log-actions";
 type ActivitySet = { setNumber: number; reps: number | null; weight: number | null; durationSeconds: number | null };
 type Activity = {
   id: string;
+  logDate: string;
   kind: "zone2" | "vo2max" | "cardio" | "strength" | "mobility";
   name: string;
   minutes: number | null;
@@ -27,13 +28,20 @@ export function ActivityLogger({
   day,
   logDate,
   activities,
+  allowDateChange = false,
+  showDates = false,
+  title = "Also logged today",
 }: {
   day: string;
   logDate: string;
   activities: Activity[];
+  allowDateChange?: boolean;
+  showDates?: boolean;
+  title?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"cardio" | "strength">("cardio");
+  const [date, setDate] = useState(logDate);
   const [pending, startTransition] = useTransition();
 
   // cardio
@@ -51,15 +59,17 @@ export function ActivityLogger({
   const reset = () => {
     setCardioName(""); setMinutes(""); setCardioKind("zone2");
     setStrengthName(""); setStrengthKind("strength"); setSets([{ reps: "", weight: "", seconds: "" }]);
+    setDate(logDate);
     setOpen(false);
   };
 
   const save = () => {
+    const useDate = allowDateChange ? date : logDate;
     if (mode === "cardio") {
       if (!cardioName.trim()) return;
       startTransition(async () => {
         await addPatientActivity({
-          day, logDate, kind: cardioKind, name: cardioName.trim(),
+          day, logDate: useDate, kind: cardioKind, name: cardioName.trim(),
           minutes: num(minutes), sets: [],
         });
         reset();
@@ -68,7 +78,7 @@ export function ActivityLogger({
       if (!strengthName.trim()) return;
       startTransition(async () => {
         await addPatientActivity({
-          day, logDate, kind: strengthKind, name: strengthName.trim(), minutes: null,
+          day, logDate: useDate, kind: strengthKind, name: strengthName.trim(), minutes: null,
           sets: sets.map((s) => ({ reps: num(s.reps), weight: num(s.weight), durationSeconds: num(s.seconds) })),
         });
         reset();
@@ -81,7 +91,7 @@ export function ActivityLogger({
 
   return (
     <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
-      <div className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Also logged today</div>
+      <div className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">{title}</div>
 
       {activities.length === 0 && !open && (
         <div className="text-[12px] text-slate-400">Nothing extra logged yet.</div>
@@ -95,6 +105,9 @@ export function ActivityLogger({
                 <div className="text-sm font-medium text-slate-900 truncate">
                   {a.name}
                   <span className="text-slate-400 font-normal"> · {KIND_LABEL[a.kind]}</span>
+                  {showDates && (
+                    <span className="text-slate-400 font-normal"> · {new Date(`${a.logDate}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
+                  )}
                 </div>
                 <div className="text-[11px] text-slate-500">
                   {a.minutes != null && `${a.minutes} min`}
@@ -148,6 +161,10 @@ export function ActivityLogger({
             </div>
             <button onClick={reset} className="text-slate-400 hover:text-slate-600" aria-label="Close"><X size={16} /></button>
           </div>
+
+          {allowDateChange && (
+            <Input label="Date" value={date} onChange={setDate} type="date" />
+          )}
 
           {mode === "cardio" ? (
             <div className="space-y-2">

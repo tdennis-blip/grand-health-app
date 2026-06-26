@@ -142,6 +142,8 @@ export async function addPatientActivity(input: z.infer<typeof addActivitySchema
   });
 
   revalidatePath(`/home/training/${parsed.day}`);
+  revalidatePath(`/home/training`);
+  revalidatePath(`/home`);
 }
 
 export async function deletePatientActivity(input: { id: string; day: string }) {
@@ -151,4 +153,6 @@ export async function deletePatientActivity(input: { id: string; day: string }) 
   );
   await recordAudit({ action: "delete", entityType: "patient_activity", entityId: input.id, patientId: user.id });
   revalidatePath(`/home/training/${input.day}`);
+  revalidatePath(`/home/training`);
+  revalidatePath(`/home`);
 }

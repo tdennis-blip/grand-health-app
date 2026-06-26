@@ -7,7 +7,9 @@ import {
   DAY_SHORT,
   DAY_LABELS,
   DAY_KEYS,
+  getRecentPatientActivities,
 } from "@/lib/training";
+import { ActivityLogger } from "./[day]/add-activity";
 
 const KIND_ICON = {
   strength: Dumbbell, zone2: Activity, vo2max: Flame, mobility: Sparkles,
@@ -109,6 +111,19 @@ export default async function PatientTrainingWeek() {
           );
         })}
       </section>
+
+      <ActivityLogger
+        day={tKey}
+        logDate={todayLocalIso()}
+        activities={await getRecentPatientActivities(14)}
+        allowDateChange
+        showDates
+        title="Logged activity (last 14 days)"
+      />
     </main>
   );
+}
+
+function todayLocalIso(): string {
+  return new Date().toISOString().slice(0, 10);
 }
