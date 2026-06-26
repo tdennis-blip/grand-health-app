@@ -4,7 +4,7 @@
 //
 // Rate-limited: a connection synced within the last STALE_AFTER_MS is skipped,
 // so navigating around the app doesn't hammer the provider's API.
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { getUser } from "@/lib/auth/server";
 import {
   daysAgo,
@@ -15,24 +15,29 @@ import {
 
 const STALE_AFTER_MS = 30 * 60 * 1000; // 30 minutes
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   const user = await getUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   if (user.role !== "patient") {
     return NextResponse.json({ ok: true, skipped: "not_patient" });
   }
 
+  // ?force=1 bypasses the throttle (used by the manual "Sync now" button).
+  const force = req.nextUrl.searchParams.get("force") === "1";
+
   const conns = await listActiveConnectionsForPatient(user.id);
   if (conns.length === 0) return NextResponse.json({ ok: true, synced: 0 });
 
   const now = Date.now();
   const start = daysAgo(2);
-  const end = ymd(new Date());
+  // End one day ahead (UTC) so today's data is always inside the window
+  // regardless of the device's local timezone offset.
+  const end = ymd(new Date(now + 24 * 60 * 60 * 1000));
 
   const results: Array<{ provider: string; ok: boolean; rows?: number; skipped?: boolean; error?: string }> = [];
   for (const c of conns) {
     const last = c.last_synced_at ? new Date(c.last_synced_at).getTime() : 0;
-    if (now - last < STALE_AFTER_MS) {
+    if (!force && now - last < STALE_AFTER_MS) {
       results.push({ provider: c.provider, ok: true, skipped: true });
       continue;
     }

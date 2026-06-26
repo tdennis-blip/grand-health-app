@@ -11,6 +11,7 @@ import { withAuth } from "@/lib/db/connection";
 import { PROVIDER_META } from "@/lib/wearables/registry";
 import type { WearableProvider } from "@/lib/wearables/types";
 import { DisconnectButton } from "./disconnect-button";
+import { SyncNowButton } from "./sync-now-button";
 
 const ORDER: WearableProvider[] = ["oura", "whoop", "apple_health", "eight_sleep"];
 
@@ -50,6 +51,12 @@ export default async function IntegrationsPage({
         </div>
         <div className="text-xs text-slate-500 mt-1">
           Connect a tracker to send sleep, HRV, and recovery to your care team.
+        </div>
+        <div className="mt-3">
+          <SyncNowButton />
+          <div className="text-[10.5px] text-slate-400 mt-1 leading-snug">
+            Today&apos;s numbers fill in after your ring syncs to the Oura app; tap to pull the latest.
+          </div>
         </div>
       </div>
 
