@@ -252,6 +252,7 @@ export class AppRuntime extends Construct {
           "cognito-idp:AdminGetUser",
           "cognito-idp:AdminSetUserPassword",
           "cognito-idp:AdminUpdateUserAttributes",
+          "cognito-idp:AdminDeleteUser",
         ],
         resources: [
           `arn:aws:cognito-idp:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:userpool/us-east-1_Yk5gVyw4D`,

@@ -1859,6 +1859,35 @@
     "aws:cdk:path": "GrandHealthStack/AppRuntime/Service/TaskDef/TaskRole/Resource"
    }
   },
+  "AppRuntimeServiceTaskDefTaskRoleDefaultPolicyA7C36C00": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "cognito-idp:AdminCreateUser",
+        "cognito-idp:AdminGetUser",
+        "cognito-idp:AdminSetUserPassword",
+        "cognito-idp:AdminUpdateUserAttributes"
+       ],
+       "Effect": "Allow",
+       "Resource": "arn:aws:cognito-idp:us-east-1:669960694177:userpool/us-east-1_Yk5gVyw4D"
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "AppRuntimeServiceTaskDefTaskRoleDefaultPolicyA7C36C00",
+    "Roles": [
+     {
+      "Ref": "AppRuntimeServiceTaskDefTaskRoleE4FC7E65"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "GrandHealthStack/AppRuntime/Service/TaskDef/TaskRole/DefaultPolicy/Resource"
+   }
+  },
   "AppRuntimeServiceTaskDef0C4908FB": {
    "Type": "AWS::ECS::TaskDefinition",
    "Properties": {
@@ -2312,6 +2341,7 @@
    "DependsOn": [
     "AppRuntimeServiceLBPublicListenerECSGroup4BEF7E2D",
     "AppRuntimeServiceLBPublicListener7F2FF880",
+    "AppRuntimeServiceTaskDefTaskRoleDefaultPolicyA7C36C00",
     "AppRuntimeServiceTaskDefTaskRoleE4FC7E65"
    ],
    "Metadata": {
@@ -2348,6 +2378,7 @@
     }
    },
    "DependsOn": [
+    "AppRuntimeServiceTaskDefTaskRoleDefaultPolicyA7C36C00",
     "AppRuntimeServiceTaskDefTaskRoleE4FC7E65"
    ],
    "Metadata": {
@@ -2375,6 +2406,7 @@
     "ToPort": 3000
    },
    "DependsOn": [
+    "AppRuntimeServiceTaskDefTaskRoleDefaultPolicyA7C36C00",
     "AppRuntimeServiceTaskDefTaskRoleE4FC7E65"
    ],
    "Metadata": {

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { requireClinician } from "@/lib/auth/server";
 import { serviceRoleSql } from "@/lib/db/connection";
 import { recordAudit } from "@/lib/audit";
-import { createCognitoUser, EmailInUseError } from "@/lib/cognito-admin";
+import { createCognitoUser, deleteCognitoUser, EmailInUseError } from "@/lib/cognito-admin";
 
 const createUserSchema = z.object({
   firstName: z.string().min(1).max(100),
@@ -39,6 +39,11 @@ export async function createUserAccount(input: z.infer<typeof createUserSchema>)
   }
 
   try {
+    // Only set primary_clinician_id if the creating clinician actually has a
+    // profile row (the FK requires it) — otherwise leave it null.
+    const [clin] = await serviceRoleSql`SELECT id FROM public.profiles WHERE id = ${user.id} LIMIT 1`;
+    const primaryClinicianId = clin ? user.id : null;
+
     // FK target stub (profiles.id → auth.users.id).
     await serviceRoleSql`
       INSERT INTO auth.users (id, email) VALUES (${sub}, ${email.toLowerCase()})
@@ -52,7 +57,7 @@ export async function createUserAccount(input: z.infer<typeof createUserSchema>)
     if (role === "patient") {
       await serviceRoleSql`
         INSERT INTO public.patient_profiles (profile_id, clinic_id, primary_clinician_id)
-        VALUES (${sub}, ${clinicId}, ${user.id})
+        VALUES (${sub}, ${clinicId}, ${primaryClinicianId})
         ON CONFLICT (profile_id) DO NOTHING
       `;
     } else {
@@ -63,7 +68,10 @@ export async function createUserAccount(input: z.infer<typeof createUserSchema>)
       `;
     }
   } catch {
-    return { ok: false, error: "Login created, but saving the profile failed. Contact support before retrying." };
+    // Roll back the Cognito user so a failed DB write doesn't leave an orphan
+    // that blocks recreating the same email.
+    await deleteCognitoUser(email.toLowerCase()).catch(() => undefined);
+    return { ok: false, error: "Couldn't save the account. Nothing was created — please try again." };
   }
 
   await recordAudit({
@@ -76,4 +84,50 @@ export async function createUserAccount(input: z.infer<typeof createUserSchema>)
 
   revalidatePath("/clinician/dashboard");
   return { ok: true, email: email.toLowerCase() };
+}
+
+// Permanently removes a patient: their messages, profile (cascades all PHI),
+// and Cognito login. Clinic-scoped — a clinician can only remove a patient in
+// their own clinic.
+export async function deletePatientAccount(input: { patientId: string }): Promise<{ ok: boolean; error?: string }> {
+  const id = z.string().uuid().safeParse(input.patientId);
+  if (!id.success) return { ok: false, error: "Invalid patient." };
+  const patientId = id.data;
+
+  const user = await requireClinician();
+
+  // Confirm the target is a patient in this clinician's clinic.
+  const [target] = await serviceRoleSql<{ email: string; role: string; clinic_id: string }[]>`
+    SELECT email, role, clinic_id FROM public.profiles WHERE id = ${patientId} LIMIT 1
+  `;
+  if (!target) return { ok: false, error: "Patient not found." };
+  if (target.clinic_id !== user.clinicId) return { ok: false, error: "Not in your clinic." };
+  if (target.role !== "patient") return { ok: false, error: "Only patient accounts can be removed here." };
+
+  try {
+    // messages FKs are RESTRICT, so clear them before the cascading profile delete.
+    await serviceRoleSql`
+      DELETE FROM public.messages
+      WHERE patient_id = ${patientId} OR sender_id = ${patientId} OR recipient_id = ${patientId}
+    `;
+    // Deleting auth.users cascades → profiles → patient_profiles + all PHI tables.
+    await serviceRoleSql`DELETE FROM auth.users WHERE id = ${patientId}`;
+    await serviceRoleSql`DELETE FROM public.profiles WHERE id = ${patientId}`;
+  } catch {
+    return { ok: false, error: "Couldn't remove the patient's data. Please try again." };
+  }
+
+  // Remove the Cognito login (best-effort; data is already gone).
+  await deleteCognitoUser(target.email).catch(() => undefined);
+
+  await recordAudit({
+    action: "delete",
+    entityType: "patient_profile",
+    entityId: patientId,
+    patientId,
+    meta: { email: target.email },
+  }).catch(() => undefined);
+
+  revalidatePath("/clinician/dashboard");
+  return { ok: true };
 }

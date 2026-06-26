@@ -5,7 +5,9 @@ import "server-only";
 import {
   CognitoIdentityProviderClient,
   AdminCreateUserCommand,
+  AdminDeleteUserCommand,
   UsernameExistsException,
+  UserNotFoundException,
 } from "@aws-sdk/client-cognito-identity-provider";
 
 const REGION = process.env.NEXT_PUBLIC_AWS_REGION || "us-east-1";
@@ -53,6 +55,19 @@ export async function createCognitoUser(opts: {
     return sub;
   } catch (err) {
     if (err instanceof UsernameExistsException) throw new EmailInUseError();
+    throw err;
+  }
+}
+
+// Deletes a Cognito user. No-op if they don't exist. Used on create rollback
+// and when removing a patient.
+export async function deleteCognitoUser(email: string): Promise<void> {
+  try {
+    await getClient().send(
+      new AdminDeleteUserCommand({ UserPoolId: USER_POOL_ID, Username: email })
+    );
+  } catch (err) {
+    if (err instanceof UserNotFoundException) return;
     throw err;
   }
 }

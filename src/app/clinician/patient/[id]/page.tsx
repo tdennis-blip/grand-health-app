@@ -13,6 +13,7 @@ import { WearableTrendCard } from "./wearable-trend-card";
 import { StackSummaryCard } from "./stack/stack-summary-card";
 import { AppointmentsCard } from "./appointments/appointments-card";
 import { getPatientAppointmentsForClinician, getClinicAppointmentTypes } from "@/lib/appointments";
+import { RemovePatientButton } from "./remove-patient";
 
 export default async function PatientDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -260,6 +261,11 @@ export default async function PatientDetail({ params }: { params: Promise<{ id: 
           )}
         </div>
       </div>
+
+      <RemovePatientButton
+        patientId={id}
+        patientName={`${profile?.first_name ?? ""} ${profile?.last_name ?? ""}`.trim() || "this patient"}
+      />
     </main>
   );
 }
