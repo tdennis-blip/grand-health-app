@@ -2,6 +2,8 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import { requireClinician } from "@/lib/auth/server";
 import { withAuth } from "@/lib/db/connection";
+import { getWeeklyCardioMinutes, getExercise1RMSeries } from "@/lib/training-analytics";
+import { CardioWeeksChart, OneRmCharts } from "./training-charts";
 
 type LogRow = {
   log_date: string;
@@ -19,7 +21,7 @@ export default async function PatientWorkoutsPage({ params }: { params: Promise<
   const { id } = await params;
   const user = await requireClinician();
 
-  const [[patient], rows] = await Promise.all([
+  const [[patient], rows, cardioWeeks, oneRmSeries] = await Promise.all([
     withAuth(user, (sql) =>
       sql`SELECT first_name, last_name FROM profiles WHERE id = ${id} LIMIT 1`
     ),
@@ -38,6 +40,8 @@ export default async function PatientWorkoutsPage({ params }: { params: Promise<
         LIMIT 300
       ` as Promise<LogRow[]>
     ),
+    getWeeklyCardioMinutes(user, id, 12),
+    getExercise1RMSeries(user, id),
   ]);
 
   // Group: date -> "session · exercise" -> rows
@@ -63,6 +67,11 @@ export default async function PatientWorkoutsPage({ params }: { params: Promise<
         <div className="text-xl font-semibold text-slate-900">{patientName}</div>
         <div className="text-xs text-slate-500 mt-1">What the patient actually did, vs. the prescribed reps × weight.</div>
       </header>
+
+      <CardioWeeksChart weeks={cardioWeeks} />
+      <OneRmCharts exercises={oneRmSeries} />
+
+      <div className="text-xs uppercase tracking-wide text-slate-500 font-semibold pt-1">Logged sets</div>
 
       {byDate.size === 0 ? (
         <div className="text-sm text-slate-500 italic py-10 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200">
