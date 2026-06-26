@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { requireClinician } from "@/lib/auth/server";
 import { withAuth } from "@/lib/db/connection";
-import { signOut } from "@/app/auth/actions";
 import { getMyUnreadCount } from "@/lib/messages";
+import { SignOutButton } from "@/components/sign-out-button";
 
 export default async function ClinicianLayout({
   children,
@@ -75,14 +75,7 @@ export default async function ClinicianLayout({
               <div>{profile.first_name} {profile.last_name}</div>
               {roleLabel && <div className="text-[11px] text-slate-400">{roleLabel}</div>}
             </div>
-            <form action={signOut}>
-              <button
-                type="submit"
-                className="text-xs font-semibold text-slate-700 bg-white border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-50"
-              >
-                Sign out
-              </button>
-            </form>
+            <SignOutButton className="text-xs font-semibold text-slate-700 bg-white border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-50" />
           </div>
         </div>
       </header>

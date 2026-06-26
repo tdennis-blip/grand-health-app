@@ -2,8 +2,8 @@ import Link from "next/link";
 import { User, Plug, ChevronRight } from "lucide-react";
 import { requirePatient } from "@/lib/auth/server";
 import { withAuth } from "@/lib/db/connection";
-import { signOut } from "@/app/auth/actions";
 import { ProfileEditor, type ProfileInitial } from "./profile-editor";
+import { SignOutButton } from "@/components/sign-out-button";
 
 export default async function PatientProfile() {
   const user = await requirePatient();
@@ -95,14 +95,7 @@ export default async function PatientProfile() {
         </div>
       </Link>
 
-      <form action={signOut}>
-        <button
-          type="submit"
-          className="w-full text-sm font-semibold text-slate-700 bg-white border border-slate-200 px-4 py-2.5 rounded-lg hover:bg-slate-50"
-        >
-          Sign out
-        </button>
-      </form>
+      <SignOutButton className="w-full text-sm font-semibold text-slate-700 bg-white border border-slate-200 px-4 py-2.5 rounded-lg hover:bg-slate-50" />
     </div>
   );
 }
