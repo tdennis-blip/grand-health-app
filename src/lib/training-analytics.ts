@@ -27,15 +27,22 @@ export async function getWeeklyCardioMinutes(
 ): Promise<CardioWeek[]> {
   const rows = await withAuth(user, (sql) =>
     sql`
-      SELECT to_char(date_trunc('week', csl.log_date), 'YYYY-MM-DD') AS week_start,
-             s.kind AS kind,
-             sum(coalesce(csl.actual_minutes, 0))::int AS minutes
-      FROM cardio_session_logs csl
-      JOIN session_library s ON s.id = csl.session_id
-      WHERE csl.patient_id = ${patientId}
-        AND csl.done = true
-        AND s.kind IN ('zone2', 'vo2max')
-        AND csl.log_date >= (current_date - ${weeks * 7})
+      SELECT week_start, kind, sum(minutes)::int AS minutes FROM (
+        SELECT to_char(date_trunc('week', csl.log_date), 'YYYY-MM-DD') AS week_start,
+               s.kind AS kind, coalesce(csl.actual_minutes, 0) AS minutes
+        FROM cardio_session_logs csl
+        JOIN session_library s ON s.id = csl.session_id
+        WHERE csl.patient_id = ${patientId} AND csl.done = true
+          AND s.kind IN ('zone2', 'vo2max')
+          AND csl.log_date >= (current_date - ${weeks * 7})
+        UNION ALL
+        SELECT to_char(date_trunc('week', pa.log_date), 'YYYY-MM-DD') AS week_start,
+               pa.kind AS kind, coalesce(pa.minutes, 0) AS minutes
+        FROM patient_activities pa
+        WHERE pa.patient_id = ${patientId}
+          AND pa.kind IN ('zone2', 'vo2max')
+          AND pa.log_date >= (current_date - ${weeks * 7})
+      ) t
       GROUP BY 1, 2
     `
   );
@@ -72,32 +79,42 @@ export async function getExercise1RMSeries(
   // Per exercise per session date, pick the single most max-like set — heaviest
   // load, tie-broken by more reps — among sets at ≤12 reps (Epley loses
   // accuracy past that). Then estimate 1RM from that set with Epley.
+  // Group by exercise NAME (lowercased) so prescribed + patient-added sets for
+  // the same movement merge into one trend line.
   const rows = await withAuth(user, (sql) =>
     sql`
-      SELECT DISTINCT ON (e.id, esl.log_date)
-             e.id AS exercise_id, e.name AS name,
-             to_char(esl.log_date, 'YYYY-MM-DD') AS date,
-             esl.actual_weight AS weight, esl.actual_reps AS reps
-      FROM exercise_set_logs esl
-      JOIN session_sets ss ON ss.id = esl.set_id
-      JOIN session_exercises se ON se.id = ss.session_exercise_id
-      JOIN exercise_library e ON e.id = se.exercise_id
-      WHERE esl.patient_id = ${patientId}
-        AND esl.actual_weight IS NOT NULL AND esl.actual_weight > 0
-        AND esl.actual_reps IS NOT NULL AND esl.actual_reps > 0
-        AND esl.actual_reps <= 12
-      ORDER BY e.id, esl.log_date, esl.actual_weight DESC, esl.actual_reps DESC
+      SELECT DISTINCT ON (name_key, d)
+             name_key, name, to_char(d, 'YYYY-MM-DD') AS date, weight, reps
+      FROM (
+        SELECT lower(e.name) AS name_key, e.name AS name, esl.log_date AS d,
+               esl.actual_weight AS weight, esl.actual_reps AS reps
+        FROM exercise_set_logs esl
+        JOIN session_sets ss ON ss.id = esl.set_id
+        JOIN session_exercises se ON se.id = ss.session_exercise_id
+        JOIN exercise_library e ON e.id = se.exercise_id
+        WHERE esl.patient_id = ${patientId}
+          AND esl.actual_weight > 0 AND esl.actual_reps > 0 AND esl.actual_reps <= 12
+        UNION ALL
+        SELECT lower(pa.name) AS name_key, pa.name AS name, pa.log_date AS d,
+               pas.weight AS weight, pas.reps AS reps
+        FROM patient_activity_sets pas
+        JOIN patient_activities pa ON pa.id = pas.activity_id
+        WHERE pa.patient_id = ${patientId}
+          AND pa.kind IN ('strength', 'mobility')
+          AND pas.weight > 0 AND pas.reps > 0 AND pas.reps <= 12
+      ) u
+      ORDER BY name_key, d, weight DESC, reps DESC
     `
   );
 
   const byExercise = new Map<string, Exercise1RM>();
   for (const r of rows as any[]) {
-    const ex: Exercise1RM = byExercise.get(r.exercise_id) ?? { exerciseId: r.exercise_id, name: r.name, points: [] };
+    const ex: Exercise1RM = byExercise.get(r.name_key) ?? { exerciseId: r.name_key, name: r.name, points: [] };
     const weight = Number(r.weight);
     const reps = Number(r.reps);
     const oneRm = Math.round(weight * (1 + reps / 30)); // Epley
     ex.points.push({ date: r.date, oneRm });
-    byExercise.set(r.exercise_id, ex);
+    byExercise.set(r.name_key, ex);
   }
   // DISTINCT ON returns rows ordered by exercise/date; sort points by date and
   // exercises by name for stable display.

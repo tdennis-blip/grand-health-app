@@ -88,3 +88,67 @@ export async function logCardioSession(input: z.infer<typeof logCardioSchema>) {
 
   revalidatePath(`/home/training/${parsed.day}`);
 }
+
+// ── Patient ad-hoc activity (workouts not in the prescribed program) ────────
+const addActivitySchema = z.object({
+  day: z.string().min(1).max(8),
+  logDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  kind: z.enum(["zone2", "vo2max", "cardio", "strength", "mobility"]),
+  name: z.string().min(1).max(200),
+  minutes: z.number().int().min(0).max(1440).nullable().default(null),
+  sets: z
+    .array(
+      z.object({
+        reps: z.number().int().min(0).max(100000).nullable(),
+        weight: z.number().int().min(0).max(100000).nullable(),
+        durationSeconds: z.number().int().min(0).max(100000).nullable(),
+      })
+    )
+    .max(50)
+    .default([]),
+});
+
+export async function addPatientActivity(input: z.infer<typeof addActivitySchema>) {
+  const parsed = addActivitySchema.parse(input);
+  const user = await requirePatient();
+
+  const [activity] = await withAuth(user, (sql) =>
+    sql`
+      INSERT INTO patient_activities (clinic_id, patient_id, log_date, kind, name, minutes)
+      VALUES (${user.clinicId}, ${user.id}, ${parsed.logDate}, ${parsed.kind}, ${parsed.name.trim()}, ${parsed.minutes})
+      RETURNING id
+    `
+  );
+  if (!activity) throw new Error("Could not save activity");
+
+  if (parsed.sets.length > 0) {
+    for (let i = 0; i < parsed.sets.length; i++) {
+      const s = parsed.sets[i];
+      await withAuth(user, (sql) =>
+        sql`
+          INSERT INTO patient_activity_sets (activity_id, set_number, reps, weight, duration_seconds)
+          VALUES (${activity.id}, ${i + 1}, ${s.reps}, ${s.weight}, ${s.durationSeconds})
+        `
+      );
+    }
+  }
+
+  await recordAudit({
+    action: "create",
+    entityType: "patient_activity",
+    entityId: activity.id,
+    patientId: user.id,
+    meta: { kind: parsed.kind, name: parsed.name, minutes: parsed.minutes, sets: parsed.sets.length, date: parsed.logDate },
+  });
+
+  revalidatePath(`/home/training/${parsed.day}`);
+}
+
+export async function deletePatientActivity(input: { id: string; day: string }) {
+  const user = await requirePatient();
+  await withAuth(user, (sql) =>
+    sql`DELETE FROM patient_activities WHERE id = ${input.id} AND patient_id = ${user.id}`
+  );
+  await recordAudit({ action: "delete", entityType: "patient_activity", entityId: input.id, patientId: user.id });
+  revalidatePath(`/home/training/${input.day}`);
+}

@@ -509,6 +509,41 @@ export const cardioSessionLogs = pgTable(
   })
 );
 
+export const patientActivities = pgTable(
+  "patient_activities",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clinicId: uuid("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
+    patientId: uuid("patient_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+    logDate: date("log_date").notNull(),
+    kind: text("kind").notNull(), // zone2|vo2max|cardio|strength|mobility
+    name: text("name").notNull(),
+    minutes: integer("minutes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    patientDateIdx: index("patient_activities_patient_date_idx").on(t.patientId, t.logDate),
+    clinicIdx: index("patient_activities_clinic_idx").on(t.clinicId),
+  })
+);
+
+export const patientActivitySets = pgTable(
+  "patient_activity_sets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    activityId: uuid("activity_id").notNull().references(() => patientActivities.id, { onDelete: "cascade" }),
+    setNumber: integer("set_number").notNull(),
+    reps: integer("reps"),
+    weight: integer("weight"),
+    durationSeconds: integer("duration_seconds"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    activityIdx: index("patient_activity_sets_activity_idx").on(t.activityId),
+  })
+);
+
 export const programLibrary = pgTable(
   "program_library",
   {

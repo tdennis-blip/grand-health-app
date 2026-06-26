@@ -7,12 +7,16 @@ import {
   getSessionDetail,
   getSetLogsForSession,
   getCardioLogForSession,
+  getPatientActivitiesForDate,
   DAY_KEYS,
   DAY_LABELS,
   type DayKey,
 } from "@/lib/training";
 import { SetLogger } from "./set-logger";
 import { CardioLogger } from "./cardio-logger";
+import { ActivityLogger } from "./add-activity";
+
+const todayIso = () => new Date().toISOString().slice(0, 10);
 
 const KIND_ICON = {
   strength: Dumbbell, zone2: Activity, vo2max: Flame, mobility: Sparkles,
@@ -73,6 +77,7 @@ export default async function PatientSessionDetail({
             Nothing scheduled. Recovery is part of the plan.
           </div>
         </div>
+        <ActivityLogger day={day} logDate={todayIso()} activities={await getPatientActivitiesForDate(todayIso())} />
       </main>
     );
   }
@@ -132,6 +137,7 @@ export default async function PatientSessionDetail({
     session.kind === "zone2" || session.kind === "vo2max"
       ? await getCardioLogForSession(session.id, logDate)
       : null;
+  const activities = await getPatientActivitiesForDate(logDate);
 
   const Icon = KIND_ICON[session.kind];
   const gradient = session.accent || KIND_TILE[session.kind];
@@ -304,6 +310,8 @@ export default async function PatientSessionDetail({
           })}
         </section>
       )}
+
+      <ActivityLogger day={day} logDate={logDate} activities={activities} />
     </main>
   );
 }

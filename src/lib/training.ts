@@ -301,21 +301,80 @@ async function sessionCompletionFraction(
 export async function getTrainingComplianceScore(
   sessions: WeekSessionLite[] | null
 ): Promise<{ value: number | null; caption: string; ok?: boolean }> {
-  if (sessions == null) return { value: null, caption: "No program assigned" };
-  if (sessions.length === 0) {
-    return { value: 100, caption: "Rest day — recovery is part of the plan", ok: true };
-  }
   const user = await getUser();
+  const logDate = new Date().toISOString().slice(0, 10);
+
+  // Patient-logged ad-hoc activities for today count toward training too.
+  let activityCount = 0;
+  if (user) {
+    const [row] = await withAuth(user, (sql) =>
+      sql`SELECT count(*)::int AS n FROM patient_activities WHERE patient_id = ${user.id} AND log_date = ${logDate}`
+    );
+    activityCount = Number(row?.n ?? 0);
+  }
+
+  if (sessions == null) {
+    if (activityCount > 0) {
+      return { value: 100, caption: `${activityCount} logged ${activityCount === 1 ? "activity" : "activities"}`, ok: true };
+    }
+    return { value: null, caption: "No program assigned" };
+  }
+  if (sessions.length === 0) {
+    return {
+      value: 100,
+      caption: activityCount > 0 ? "Rest day + extra activity" : "Rest day — recovery is part of the plan",
+      ok: true,
+    };
+  }
   if (!user) return { value: null, caption: "Sign in to score training" };
 
-  const logDate = new Date().toISOString().slice(0, 10);
-  let sum = 0;
-  for (const s of sessions) {
-    sum += await sessionCompletionFraction(user, s, logDate);
-  }
-  const value = Math.round((sum / sessions.length) * 100);
+  const fractions: number[] = [];
+  for (const s of sessions) fractions.push(await sessionCompletionFraction(user, s, logDate));
+  for (let i = 0; i < activityCount; i++) fractions.push(1);
+
+  const value = Math.round((fractions.reduce((a, b) => a + b, 0) / fractions.length) * 100);
   const label = sessions.length === 1 ? sessions[0].name : `${sessions.length} sessions`;
-  return { value, caption: `${label} · ${value}% complete`, ok: value >= 100 };
+  const extra = activityCount > 0 ? ` +${activityCount} extra` : "";
+  return { value, caption: `${label} · ${value}% complete${extra}`, ok: value >= 100 };
+}
+
+export type PatientActivity = {
+  id: string;
+  kind: "zone2" | "vo2max" | "cardio" | "strength" | "mobility";
+  name: string;
+  minutes: number | null;
+  sets: Array<{ setNumber: number; reps: number | null; weight: number | null; durationSeconds: number | null }>;
+};
+
+// The patient's own ad-hoc activities logged for a date.
+export async function getPatientActivitiesForDate(logDate: string): Promise<PatientActivity[]> {
+  const user = await getUser();
+  if (!user) return [];
+  const acts = await withAuth(user, (sql) =>
+    sql`SELECT id, kind, name, minutes FROM patient_activities
+        WHERE patient_id = ${user.id} AND log_date = ${logDate}
+        ORDER BY created_at ASC`
+  );
+  if (acts.length === 0) return [];
+  const ids = acts.map((a: any) => a.id as string);
+  const sets = await withAuth(user, (sql) =>
+    sql`SELECT activity_id, set_number, reps, weight, duration_seconds
+        FROM patient_activity_sets WHERE activity_id = ANY(${ids}) ORDER BY set_number ASC`
+  );
+  const byActivity: Record<string, any[]> = {};
+  sets.forEach((s: any) => (byActivity[s.activity_id] ?? (byActivity[s.activity_id] = [])).push(s));
+  return acts.map((a: any) => ({
+    id: a.id,
+    kind: a.kind,
+    name: a.name,
+    minutes: a.minutes,
+    sets: (byActivity[a.id] ?? []).map((s: any) => ({
+      setNumber: s.set_number,
+      reps: s.reps,
+      weight: s.weight,
+      durationSeconds: s.duration_seconds,
+    })),
+  }));
 }
 
 export type CardioLog = { actualMinutes: number | null; done: boolean };
