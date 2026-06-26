@@ -25,6 +25,10 @@ export async function getWeeklyCardioMinutes(
   patientId: string,
   weeks = 12
 ): Promise<CardioWeek[]> {
+  const since = new Date();
+  since.setUTCDate(since.getUTCDate() - weeks * 7);
+  const sinceIso = since.toISOString().slice(0, 10);
+
   const rows = await withAuth(user, (sql) =>
     sql`
       SELECT week_start, kind, sum(minutes)::int AS minutes FROM (
@@ -34,14 +38,14 @@ export async function getWeeklyCardioMinutes(
         JOIN session_library s ON s.id = csl.session_id
         WHERE csl.patient_id = ${patientId} AND csl.done = true
           AND s.kind IN ('zone2', 'vo2max')
-          AND csl.log_date >= (current_date - ${weeks * 7})
+          AND csl.log_date >= ${sinceIso}
         UNION ALL
         SELECT to_char(date_trunc('week', pa.log_date), 'YYYY-MM-DD') AS week_start,
                pa.kind AS kind, coalesce(pa.minutes, 0) AS minutes
         FROM patient_activities pa
         WHERE pa.patient_id = ${patientId}
           AND pa.kind IN ('zone2', 'vo2max')
-          AND pa.log_date >= (current_date - ${weeks * 7})
+          AND pa.log_date >= ${sinceIso}
       ) t
       GROUP BY 1, 2
     `
