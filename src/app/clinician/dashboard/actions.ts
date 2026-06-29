@@ -110,10 +110,21 @@ export async function deletePatientAccount(input: { patientId: string }): Promis
       DELETE FROM public.messages
       WHERE patient_id = ${patientId} OR sender_id = ${patientId} OR recipient_id = ${patientId}
     `;
-    // Deleting auth.users cascades → profiles → patient_profiles + all PHI tables.
+    // Delete medications explicitly FIRST, while the profile still exists.
+    // The log_medication_change() trigger inserts a "delete" row into
+    // medication_change_log on each med delete, and that row FKs to profiles —
+    // so it must run before the profile is gone. (If we let the profile-delete
+    // cascade remove medications, the trigger fires mid-statement and the log
+    // insert violates the FK, aborting the whole delete.) The change-log rows
+    // we just created are then cleaned up by the profile cascade below.
+    await serviceRoleSql`DELETE FROM public.medications WHERE patient_id = ${patientId}`;
+    await serviceRoleSql`DELETE FROM public.medication_change_log WHERE patient_id = ${patientId}`;
+    // auth.users has no dependents; harmless if the row is already gone.
     await serviceRoleSql`DELETE FROM auth.users WHERE id = ${patientId}`;
+    // Deleting the profile cascades → patient_profiles + all remaining PHI tables.
     await serviceRoleSql`DELETE FROM public.profiles WHERE id = ${patientId}`;
-  } catch {
+  } catch (err) {
+    console.error("deletePatientAccount failed", err);
     return { ok: false, error: "Couldn't remove the patient's data. Please try again." };
   }
 
