@@ -13,7 +13,7 @@ const dietSchema = z.object({
   rmrMeasuredOn: z.string().nullish(),   // 'YYYY-MM-DD' or empty
   rmrMeasuredBy: z.string().max(200).nullish(),
   activityMultiplier: z.number().min(1.0).max(2.5),
-  activityMode: z.enum(["static", "dynamic"]).default("static"),
+  activityMode: z.enum(["static", "dynamic", "threshold"]).default("static"),
   baseMultiplier: z.number().min(1.0).max(1.6),
   activityCreditPct: z.number().int().min(0).max(100),
   deficitKcal: z.number().int().min(-2000).max(2000),

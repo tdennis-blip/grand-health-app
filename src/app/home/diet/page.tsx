@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Apple, Droplet, ChevronLeft } from "lucide-react";
+import { Apple, Droplet, ChevronLeft, Flame } from "lucide-react";
 import { requirePatient } from "@/lib/auth/server";
 import { withAuth } from "@/lib/db/connection";
 import {
@@ -76,7 +76,7 @@ export default async function PatientDiet() {
           <div className="bg-gradient-to-br from-orange-500 via-orange-500 to-rose-500 text-white rounded-3xl p-5">
             <div className="flex items-center justify-between">
               <div className="text-[10px] uppercase tracking-wide opacity-90">Daily kcal goal</div>
-              {targets.activityMode === "dynamic" && targets.activitySource !== "none" && (
+              {targets.activityMode !== "static" && targets.activitySource !== "none" && (
                 <span className="text-[9.5px] uppercase tracking-wide font-semibold bg-white/20 rounded-full px-2 py-0.5">
                   {targets.activitySource === "wearable"
                     ? `${targets.activityProvider ?? "wearable"} synced`
@@ -85,7 +85,26 @@ export default async function PatientDiet() {
               )}
             </div>
             <div className="text-4xl font-semibold mt-1 tabular-nums">{targets.goalKcal.toLocaleString()}</div>
-            {targets.activityMode === "dynamic" ? (
+            {targets.activityMode === "threshold" ? (
+              <>
+                <div className="text-[12px] opacity-90 mt-1">
+                  Base {targets.baseKcal.toLocaleString()}
+                  {targets.activeKcalCredited > 0 && ` + ${targets.activeKcalCredited} extra burned`}
+                  {targets.deficitKcal !== 0 && ` · ${targets.deficitKcal > 0 ? "+" : ""}${targets.deficitKcal} kcal/day`}
+                </div>
+                {targets.activeKcalCredited > 0 ? (
+                  <div className="text-[10.5px] opacity-80 mt-1">
+                    Burned {targets.activeKcalRaw.toLocaleString()} kcal today · {targets.activityThresholdKcal.toLocaleString()} already in your base, so +{targets.activeKcalCredited.toLocaleString()} added.
+                  </div>
+                ) : (
+                  <div className="text-[10.5px] opacity-80 mt-1">
+                    {targets.activeKcalRaw > 0
+                      ? `Burned ${targets.activeKcalRaw.toLocaleString()} kcal — within the ${targets.activityThresholdKcal.toLocaleString()} already in your base, so no change.`
+                      : "Goal rises only when you burn more than your usual day."}
+                  </div>
+                )}
+              </>
+            ) : targets.activityMode === "dynamic" ? (
               <>
                 <div className="text-[12px] opacity-90 mt-1">
                   Base {targets.baseKcal.toLocaleString()}
@@ -110,6 +129,66 @@ export default async function PatientDiet() {
               </div>
             )}
           </div>
+
+          {/* Calories burned today (wearable / estimated) — only for activity-aware plans */}
+          {targets.activityMode !== "static" && (
+            <section className="bg-white rounded-2xl border border-slate-200 p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Flame size={15} className="text-rose-500" />
+                  <div className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Calories burned today</div>
+                </div>
+                <span className={`text-[9.5px] uppercase tracking-wide font-semibold px-2 py-0.5 rounded-full border ${
+                  targets.activitySource === "wearable"
+                    ? "bg-rose-50 text-rose-700 border-rose-200"
+                    : targets.activitySource === "estimated"
+                    ? "bg-slate-50 text-slate-600 border-slate-200"
+                    : "bg-slate-50 text-slate-400 border-slate-200"
+                }`}>
+                  {targets.activitySource === "wearable"
+                    ? `${targets.activityProvider ?? "wearable"} synced`
+                    : targets.activitySource === "estimated"
+                    ? "estimated"
+                    : "no data"}
+                </span>
+              </div>
+
+              <div className="mt-2 flex items-baseline gap-1.5">
+                <span className="text-3xl font-semibold text-slate-900 tabular-nums">
+                  {targets.activeKcalRaw > 0 ? targets.activeKcalRaw.toLocaleString() : "—"}
+                </span>
+                <span className="text-sm text-slate-500">active kcal</span>
+              </div>
+
+              {targets.activityMode === "threshold" ? (
+                targets.activeKcalRaw > 0 ? (
+                  <div className="mt-2 text-[12px] text-slate-600 leading-snug">
+                    Your daily goal already assumes about{" "}
+                    <span className="font-semibold tabular-nums">{targets.activityThresholdKcal.toLocaleString()}</span> kcal of activity.{" "}
+                    {targets.activeKcalCredited > 0 ? (
+                      <>You burned <span className="font-semibold tabular-nums">{targets.activeKcalRaw.toLocaleString()}</span>, so the extra{" "}
+                      <span className="font-semibold text-emerald-700 tabular-nums">+{targets.activeKcalCredited.toLocaleString()}</span> kcal was added to today&apos;s goal.</>
+                    ) : (
+                      <>That&apos;s within your usual day, so no change to your goal.</>
+                    )}
+                  </div>
+                ) : (
+                  <div className="mt-2 text-[12px] text-slate-500 leading-snug">
+                    No activity recorded yet today. Burn more than your usual day and the extra gets added to your goal.
+                  </div>
+                )
+              ) : (
+                <div className="mt-2 text-[12px] text-slate-600 leading-snug">
+                  {targets.activeKcalCredited > 0
+                    ? <>Crediting {targets.activityCreditPct}% — <span className="font-semibold text-emerald-700 tabular-nums">+{targets.activeKcalCredited.toLocaleString()}</span> kcal added to today&apos;s goal.</>
+                    : "Logs and wearable syncs raise today's goal as you move."}
+                </div>
+              )}
+              <Link href="/home/profile/integrations" className="mt-2 inline-block text-[11px] text-teal-700 font-medium">
+                Manage wearables →
+              </Link>
+            </section>
+          )}
 
           {/* Today logged vs target — progress bars */}
           <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">

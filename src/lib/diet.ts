@@ -6,7 +6,7 @@ import { withAuth } from "@/lib/db/connection";
 import type { AuthUser } from "@/lib/auth/server";
 import { getActiveKcalForDate } from "@/lib/activity-calories";
 
-export type ActivityMode = "static" | "dynamic";
+export type ActivityMode = "static" | "dynamic" | "threshold";
 
 export type DietPlanRow = {
   rmrValue: number | null;
@@ -56,6 +56,9 @@ export type DietTargets = {
   activityCreditPct: number;
   activitySource: "wearable" | "estimated" | "none";
   activityProvider: string | null;
+  // Threshold-mode only: activity the multiplier already assumes. Calories
+  // burned above this get added on top; at or below it, no adjustment.
+  activityThresholdKcal: number;
 };
 
 export function deriveTargets(
@@ -68,6 +71,7 @@ export function deriveTargets(
   let baseKcal: number;
   let activeKcalRaw = 0;
   let activeKcalCredited = 0;
+  let activityThresholdKcal = 0;
   let activitySource: "wearable" | "estimated" | "none" = "none";
   let activityProvider: string | null = null;
 
@@ -79,6 +83,17 @@ export function deriveTargets(
     activitySource = activity?.source ?? "none";
     activityProvider = activity?.provider ?? null;
     activeKcalCredited = Math.round(activeKcalRaw * (plan.activityCreditPct / 100));
+  } else if (plan.activityMode === "threshold") {
+    // Keep the normal multiplier-based goal as the floor. The activity that
+    // multiplier already assumes (rmr * (multiplier - 1)) is the threshold;
+    // only calories burned ABOVE it get added on top. At or below it, no
+    // adjustment — so a light day never lowers the target.
+    baseKcal = Math.round(rmr * plan.activityMultiplier);
+    activityThresholdKcal = Math.max(0, Math.round(rmr * (plan.activityMultiplier - 1)));
+    activeKcalRaw = activity?.activeKcal ?? 0;
+    activitySource = activity?.source ?? "none";
+    activityProvider = activity?.provider ?? null;
+    activeKcalCredited = Math.max(0, activeKcalRaw - activityThresholdKcal);
   } else {
     // Static: legacy single-multiplier TDEE.
     baseKcal = Math.round(rmr * plan.activityMultiplier);
@@ -110,6 +125,7 @@ export function deriveTargets(
     activityCreditPct: plan.activityCreditPct,
     activitySource,
     activityProvider,
+    activityThresholdKcal,
   };
 }
 
@@ -449,14 +465,16 @@ export async function getMyDietTargets(): Promise<{
     mealsPerDay: plan.meals_per_day,
     waterL: Number(plan.water_l),
     notes: plan.notes,
-    activityMode: (plan.activity_mode === "dynamic" ? "dynamic" : "static") as ActivityMode,
+    activityMode: ((plan.activity_mode === "dynamic" || plan.activity_mode === "threshold")
+      ? plan.activity_mode
+      : "static") as ActivityMode,
     baseMultiplier: Number(plan.base_multiplier ?? 1.2),
     activityCreditPct: Number(plan.activity_credit_pct ?? 50),
   };
 
   // Only spend a query on activity when the plan actually uses it.
   let activity: ActivityInput | null = null;
-  if (planRow.activityMode === "dynamic") {
+  if (planRow.activityMode === "dynamic" || planRow.activityMode === "threshold") {
     const res = await getActiveKcalForDate(user, isoDate(new Date()), weightKg);
     activity = { activeKcal: res.kcal, source: res.source, provider: res.provider };
   }

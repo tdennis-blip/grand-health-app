@@ -10,7 +10,7 @@ type DietForm = {
   rmrMeasuredOn: string | null;
   rmrMeasuredBy: string | null;
   activityMultiplier: number;
-  activityMode: "static" | "dynamic";
+  activityMode: "static" | "dynamic" | "threshold";
   baseMultiplier: number;
   activityCreditPct: number;
   deficitKcal: number;
@@ -75,15 +75,23 @@ export function DietPlanCard({
 
   // Example active-calorie burn used only to preview the dynamic formula.
   const EXAMPLE_ACTIVE_KCAL = 400;
+  // Example "active day" burn used to preview the threshold formula.
+  const EXAMPLE_THRESHOLD_BURN = 700;
 
   // Derived targets
   const derived = useMemo(() => {
     const rmr = form.rmrValue || 0;
     let base: number;
     let exampleCredit = 0;
+    let thresholdKcal = 0;
     if (form.activityMode === "dynamic") {
       base = Math.round(rmr * (form.baseMultiplier || 1.2));
       exampleCredit = Math.round(EXAMPLE_ACTIVE_KCAL * (form.activityCreditPct / 100));
+    } else if (form.activityMode === "threshold") {
+      base = Math.round(rmr * (form.activityMultiplier || 1.55));
+      thresholdKcal = Math.max(0, Math.round(rmr * ((form.activityMultiplier || 1.55) - 1)));
+      // Example: a 700 kcal burn day, crediting only what's above the threshold.
+      exampleCredit = Math.max(0, EXAMPLE_THRESHOLD_BURN - thresholdKcal);
     } else {
       base = Math.round(rmr * (form.activityMultiplier || 1.55));
     }
@@ -94,7 +102,7 @@ export function DietPlanCard({
     const fatKcal = Math.round(goalKcal * (form.fatPct / 100));
     const carbsG = Math.round(carbsKcal / 4);
     const fatG = Math.round(fatKcal / 9);
-    return { tdee, goalKcal, proteinG, carbsG, fatG, base, exampleCredit };
+    return { tdee, goalKcal, proteinG, carbsG, fatG, base, exampleCredit, thresholdKcal };
   }, [form, weightKg]);
 
   const macroSum = form.carbsPct + form.fatPct; // protein is grams-based, not %
@@ -167,11 +175,13 @@ export function DietPlanCard({
       {/* Derived targets — live preview */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
         <Tile
-          label={form.activityMode === "dynamic" ? "Goal (example day)" : "Daily kcal goal"}
+          label={form.activityMode === "static" ? "Daily kcal goal" : "Goal (example day)"}
           value={derived.goalKcal.toLocaleString()}
           sub={
             form.activityMode === "dynamic"
               ? `Base ${derived.base.toLocaleString()} + ${derived.exampleCredit} active${form.deficitKcal !== 0 ? ` · ${form.deficitKcal > 0 ? "+" : ""}${form.deficitKcal}` : ""}`
+              : form.activityMode === "threshold"
+              ? `Floor ${derived.base.toLocaleString()} + ${derived.exampleCredit} over threshold${form.deficitKcal !== 0 ? ` · ${form.deficitKcal > 0 ? "+" : ""}${form.deficitKcal}` : ""}`
               : `TDEE ${derived.tdee.toLocaleString()}${form.deficitKcal !== 0 ? ` · ${form.deficitKcal > 0 ? "+" : ""}${form.deficitKcal}` : ""}`
           }
           tone="orange"
@@ -224,6 +234,15 @@ export function DietPlanCard({
             </button>
             <button
               type="button"
+              onClick={() => update("activityMode", "threshold")}
+              className={`text-xs px-3 py-1.5 rounded-lg border transition ${
+                form.activityMode === "threshold" ? "bg-teal-700 text-white border-teal-700" : "bg-white text-slate-700 border-slate-200 hover:border-slate-300"
+              }`}
+            >
+              Threshold (above usual)
+            </button>
+            <button
+              type="button"
               onClick={() => update("activityMode", "dynamic")}
               className={`text-xs px-3 py-1.5 rounded-lg border transition ${
                 form.activityMode === "dynamic" ? "bg-teal-700 text-white border-teal-700" : "bg-white text-slate-700 border-slate-200 hover:border-slate-300"
@@ -235,11 +254,13 @@ export function DietPlanCard({
           <div className="text-[10.5px] text-slate-500 leading-snug mt-1.5">
             {form.activityMode === "static"
               ? "Fixed daily target: RMR × multiplier. Doesn't change with workouts."
+              : form.activityMode === "threshold"
+              ? "RMR × multiplier is the floor. The activity that multiplier already assumes is the threshold — only calories burned above it (wearable, or estimated from scheduled sessions) get added. Easy days never lower the target."
               : "Daily target adjusts to logged activity: RMR × base + a share of that day's active calories (wearable, or estimated from scheduled sessions)."}
           </div>
         </div>
 
-        {form.activityMode === "static" ? (
+        {form.activityMode !== "dynamic" ? (
           <div>
             <Label>Activity multiplier</Label>
             <div className="flex flex-wrap gap-1.5">
@@ -259,6 +280,11 @@ export function DietPlanCard({
                 );
               })}
             </div>
+            {form.activityMode === "threshold" && (
+              <div className="text-[10.5px] text-slate-500 leading-snug mt-1.5">
+                Threshold ≈ <span className="font-semibold tabular-nums">{derived.thresholdKcal.toLocaleString()}</span> active kcal/day (already in the goal). A {EXAMPLE_THRESHOLD_BURN}-kcal day would add <span className="font-semibold tabular-nums">+{derived.exampleCredit.toLocaleString()}</span> on top.
+              </div>
+            )}
           </div>
         ) : (
           <>

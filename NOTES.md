@@ -49,12 +49,42 @@ Remaining: browser smoke test — clinician program → strength session with ex
 - **Sleep page** (`/home/sleep`): "Last night" hero shows **To bed / Woke up** times via new `formatClockTime()` in `queries.ts` (reads HH:MM off the ISO string so it shows the device's local clock, no tz math).
 - **Calories burned today card** on the **Today home page** (under the What-to-do grid), only when a device measured `active_kcal`. New `getActiveKcalToday()` in `queries.ts`. Card links to /home/diet and notes it feeds the daily goal (which it does in dynamic-mode plans via the 0020 work).
 
+**✅ VERIFIED 2026-06-29: migrations 0020 AND 0021 are both live on staging** — confirmed `active_kcal`, `bedtime_start`, `bedtime_end` all present on `wearable_daily_metrics` via the bastion tunnel. (Historical note below kept for the run procedure.)
+
 **⚠️ Migrations 0020 AND 0021 must both be run on staging** (the secret-overwrite outage interrupted things — 0020 may still be unrun). Run in order via the bastion tunnel + `DIRECT_DATABASE_URL`:
 ```bash
 psql "$DIRECT_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/0020_activity_aware_calories.sql
 psql "$DIRECT_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/0021_wearable_bedtime.sql
 ```
 Without them, the Oura backfill/sync upsert (which writes active_kcal/total_kcal/bedtime_*) will fail.
+
+---
+
+## 📋 Session log 2026-06-26 — exercise builder, ad-hoc logging, clinician analytics, in-app accounts
+
+All shipped to staging (run GitHub workflow manually each time — auto-trigger still not firing). Migrations 0020–0024 applied on staging.
+
+**Exercise builder (migration 0023):** per-set **time** (`session_sets.duration_seconds`) → patient gets a countdown timer + "Actual (s)" field (prefill full). **Left/Right** (`exercise_library.per_side` + `exercise_set_logs.side` 'na'/'left'/'right', new unique key incl. side; `actual_seconds` added) → patient logs L and R rows separately. Time is set **per-set in the session editor** (not the exercises library tab — open question whether to add a default duration there). Exercise **video plays inline** (`<video controls preload=none playsInline>`).
+
+**Patient ad-hoc activity (migration 0024):** `patient_activities` + `patient_activity_sets`. "Add what you did" on every training day view (today-dated) AND the weekly `/home/training` page (date picker for backdating + recent-14-day list). Cardio (zone2/vo2max/other + minutes) and strength/mobility (name + sets). Counts everywhere: weekly cardio chart, 1RM chart (grouped by exercise NAME so prescribed + ad-hoc merge), and hero training compliance.
+
+**Clinician progress charts** (on "View logged workouts", `lib/training-analytics.ts` + `workouts/training-charts.tsx`): weekly Zone 2 + VO₂ max minutes (12 wk); **estimated 1RM per exercise over time** = Epley on the **heaviest set ≤12 reps** per session (most max-like set). SQL gotchas fixed: precompute date cutoff in JS (not `current_date - int`), cast `session_kind` enum `::text` for UNION.
+
+**Hero (`today-score.ts`):** training = compliance (rest 100; strength = % sets done; cardio done?100:0; +ad-hoc activities averaged in). Diet date-match fix (`food_logs.log_date::text`). Sleep = Oura sleep score.
+
+**Oura freshness:** widened sync window (end = tomorrow UTC) + **"Sync now"** button on integrations (force=1 bypasses 30-min throttle). Data lag is Oura-side (ring → Oura cloud → us). USDA 429 fixed (real `USDA_API_KEY`).
+
+**Auth fixes:** login treats already-authenticated as success; **full sign-out** now clears the Amplify session too (`components/sign-out-button.tsx` + `/auth/sign-out` route) — server-only signout left Amplify alive so you couldn't switch users.
+
+**⭐ In-app account provisioning (live after cdk deploy):**
+- Clinician dashboard **"Add patient"** (role toggle patient/staff) → `createUserAccount` (`dashboard/actions.ts`) → Cognito `AdminCreateUser` (emails temp pw) + `auth.users`+`profiles`+role-profile rows. First login handles Cognito **new-password challenge** (`login/page.tsx`). Hardened: guards `primary_clinician_id` (null if clinician has no profile), rolls back the Cognito user if the DB write fails.
+- **Remove patient**: danger-zone button on patient page → `deletePatientAccount` clears messages (FK restrict), deletes `auth.users` (cascades all PHI), deletes Cognito user. Hard delete by design — add a "deactivate" path before real PHI.
+- New dep `@aws-sdk/client-cognito-identity-provider`; task role granted `cognito-idp:Admin{CreateUser,GetUser,SetUserPassword,UpdateUserAttributes,DeleteUser}` in `app-runtime.ts` (needs `cdk deploy`).
+- **All clinicians in a clinic see all patients** (RLS scopes by clinic, not assigned clinician) — desired. `primary_clinician_id` is a label only.
+
+**Ops facts:** bastion instance is now **`i-075685ed25f5a9f0c`** (replaced on a deploy — use this in the SSM tunnel). `tdennis@mygrandhealth.com` promoted to primary clinician (Cognito attrs + profile + clinician_profile). For test patients use Gmail `+alias` (e.g. `tsdennis2+pt1@gmail.com`). Cognito default email caps ~50/day — move to SES before volume.
+
+**⏳ OPEN / NEXT:** decide exercise-library default duration; clinician workout *table* still doesn't show per-side/actual-seconds/cardio (charts do); GitHub auto-deploy on push (still manual); confirm AWS BAA before real PHI; consider deactivate-vs-delete for patients; SES for invite email volume.
 
 ---
 
