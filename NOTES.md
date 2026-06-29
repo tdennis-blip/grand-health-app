@@ -12,12 +12,35 @@ Living orientation doc for the production app. **Read this first** when picking 
 - **RDS endpoint:** `grandhealthstack-postgres9dc8bb04-1ez67niaci4f.ce1muwi8yqjt.us-east-1.rds.amazonaws.com`
 - **DNS:** `mygrandhealth.com` is on **Squarespace**. The `staging` subdomain is delegated to Route 53 via four `NS` records (Host `staging`) pointing at: ns-1533.awsdns-63.org, ns-1833.awsdns-37.co.uk, ns-247.awsdns-30.com, ns-606.awsdns-11.net. ACM cert auto-validates through that delegated zone.
 - **CI/CD live:** push to `main` → GitHub Actions builds image → ECR → rolls the ECS service (`.github/workflows/deploy.yml`). GitHub repo has secret `AWS_DEPLOY_ROLE_ARN` + var `NEXT_PUBLIC_SITE_URL=https://staging.mygrandhealth.com`.
-- **Secret `grand-health/staging/app-env`:** real `DATABASE_URL`/`SERVICE_ROLE_DATABASE_URL` (RDS endpoint, sslmode=require), `USDA_API_KEY=DEMO_KEY`, Cloudinary name+key+**secret (set)**. **Still `REPLACE_ME`: `ANTHROPIC_API_KEY`** (diet AI plan generator) — fill via `put-secret-value` (read-modify-write with jq) then `aws ecs update-service --cluster grand-health-staging --service grand-health-staging-web --force-new-deployment`.
+- **Secret `grand-health/staging/app-env`:** real `DATABASE_URL`/`SERVICE_ROLE_DATABASE_URL` (RDS endpoint, sslmode=require), `USDA_API_KEY=DEMO_KEY`, Cloudinary name+key+**secret (set)**. **`ANTHROPIC_API_KEY` now SET** (filled 2026-06-29 — diet AI plan generator enabled). Pattern if it ever needs rotating: `put-secret-value` (read-modify-write with jq, `file://` temp) then `aws ecs update-service --cluster grand-health-staging --service grand-health-staging-web --force-new-deployment`.
 - **Test users (password `Grand1230!`):** clinician `nurse@grandhealth.local` (Dana Lopez), patient `patient1@grandhealth.local` (Sam Okafor). Created via `scripts/create-test-user.sh` + profile insert over the bastion tunnel.
 - **Bastion tunnel** (for psql/migrations against private RDS): `aws ssm start-session --target i-0545839633bb8fc95 --document-name AWS-StartPortForwardingSessionToRemoteHost --parameters '{"host":["<RDS endpoint above>"],"portNumber":["5432"],"localPortNumber":["5432"]}'` then `export DIRECT_DATABASE_URL="postgresql://grandhealth:<pw>@localhost:5432/grandhealth?sslmode=require"`. **It keeps dropping** because the repo lives in an **iCloud** folder — see "move to ~/dev" below.
 - **Redeploy with domain (idempotent):** `cd infra && npx cdk deploy -c stage=staging -c withService=true -c domain=staging.mygrandhealth.com -c hostedZone=staging.mygrandhealth.com`.
 
 Full ordered runbook: `docs/deploy-staging-runbook.md`.
+
+---
+
+## 📋 Session log 2026-06-29 — diet activity v2, password reset, delete + save bug fixes
+
+All shipped via `git push` + manual deploy workflow (still no auto-deploy). Verified bastion instance still `i-075685ed25f5a9f0c`.
+
+**✅ Diet AI enabled** — `ANTHROPIC_API_KEY` was still `REPLACE_ME`; filled it in `grand-health/staging/app-env` via read-modify-write (`jq` → `put-secret-value file://`, NOT touching `secretObjectValue`) + `force-new-deployment`. (Note: a key was briefly pasted into a chat transcript and immediately revoked/replaced — rotate if ever in doubt.)
+
+**✅ Verified migrations 0020 + 0021 live** on staging (`active_kcal`, `bedtime_start/end` present on `wearable_daily_metrics`).
+
+**⭐ New diet activity mode: `threshold` (migration 0026).** Third `diet_plans.activity_mode` alongside static/dynamic. Goal floor = `rmr × activity_multiplier`; the activity that multiplier already assumes (`rmr × (multiplier − 1)`) is a threshold, and only Oura calories burned **above** it get added (`excess = max(0, active_kcal − threshold)`). Easy days never lower the target. Source = wearable first, MET-estimate fallback. Credits the excess at 100% (no credit-% knob like dynamic — could add later).
+   - `lib/diet.ts` (`deriveTargets` threshold branch + `activityThresholdKcal`; `getMyDietTargets` fetches activity for threshold too), patient `home/diet/page.tsx` (new **"Calories burned today"** card + headline breakdown; shows for any non-static plan), clinician `diet/diet-plan-card.tsx` (3rd toggle + live preview), `diet/actions.ts` enum, `patient/[id]/page.tsx` mapping ×2.
+   - **Oura "today" lags**: current-day `active_kcal` is null until the ring syncs ring→Oura cloud→us (historical days populate fine). Not a bug; "Sync now" only helps once Oura cloud has the day. Threshold credit therefore reflects finalized days. (Optional: show "most recent day" fallback when today is pending — not built.)
+
+**⭐ Self-service password reset.** Cognito ForgotPassword/ConfirmForgotPassword flow on `/login` ("Forgot password?" → email code → code + new password). `lib/auth/client.ts` (`requestPasswordReset`/`confirmPasswordReset`), `login/page.tsx` (two new views). Works because `createCognitoUser` already sets `email_verified=true`. Reset emails count against Cognito's ~50/day cap → another reason for SES.
+
+**🐛 Fixes:**
+- **Negative deficit/surplus couldn't be entered** — `NumField` coerced every keystroke through `Number()||0`, eating the `-` and leading 0. Rewrote with a local text buffer (`diet-plan-card.tsx`).
+- **Diet plan save failed (ZodError "expected string, received date" on `rmrMeasuredOn`)** — postgres-js returns `date` columns as JS `Date`; the clinician page passed the raw Date into the form → action zod rejected it. Fixed: `page.tsx` normalizes `rmr_measured_on` to `YYYY-MM-DD`; `actions.ts` schema also `z.preprocess`-coerces a Date. (Same `::text`/Date gotcha as elsewhere — watch any new date-column read.)
+- **Remove patient failed + single medication delete was broken (latent)** — `log_medication_change()` is an AFTER DELETE trigger that inserted an audit row referencing the just-deleted med (`medication_id` FK) and, on cascade, the dying profile (`patient_id` FK). **Migration 0027** rewrites the trigger to log `medication_id = NULL` on delete (full prior state still in `before` jsonb). Plus `deletePatientAccount` now deletes meds + change-log **before** the profile so the trigger's `patient_id` insert succeeds, then the profile cascade cleans up. Verified end-to-end via a `BEGIN…ROLLBACK` dry run. Caveat: deleted-med audit rows have null `medication_id`, so they show on the patient-wide timeline but not the per-med history page.
+
+**⏳ OPEN / NEXT:** still `ANTHROPIC_API_KEY` rotation hygiene; consider credit-% knob for threshold mode; "today pending" fallback on the burned-calories card; SES for email volume; auto-deploy on push still not firing.
 
 ---
 

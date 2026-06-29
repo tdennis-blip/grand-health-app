@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { Search, Plus, Trash2, X, Star, Barcode, Pencil } from "lucide-react";
 import type { DayEntry, QuickFood } from "@/lib/diet";
 import { addFoodLogEntry, removeFoodLogEntry, quickAddFoodLogEntry } from "./entry-actions";
 import { toggleFoodFavorite } from "./favorite-actions";
-import type { UsdaFood } from "@/lib/usda";
+import type { UsdaFood, FoodServing } from "@/lib/usda";
 import { BarcodeScanner } from "./barcode-scanner";
 import { CustomFoodForm } from "./custom-food-form";
 
@@ -33,6 +33,7 @@ type CachedFood = {
   brand: string | null;
   category: string | null;
   barcode: string | null;
+  serving?: FoodServing | null;
   nutrients: UsdaFood["nutrients"];
 };
 
@@ -458,16 +459,89 @@ function FoodPicker({
   //   - selectedQuick: a known foods.id, added via quickAddFoodLogEntry
   const [selectedUsda, setSelectedUsda] = useState<UsdaFood | null>(null);
   const [selectedQuick, setSelectedQuick] = useState<
-    | { foodId: string; name: string; brand: string | null; kcal: number | null; protein: number | null; carbs: number | null; fat: number | null }
+    | { foodId: string; name: string; brand: string | null; kcal: number | null; protein: number | null; carbs: number | null; fat: number | null; serving: FoodServing | null }
     | null
   >(null);
   const [meal, setMeal] = useState<Meal>(initialMeal);
-  const [quantity, setQuantity] = useState<string>("100");
+  const [quantity, setQuantity] = useState<string>("1");
+  const [unitKey, setUnitKey] = useState<string>("g100");
+  // Per-food household portions fetched from USDA's detail endpoint on select.
+  const [extraServings, setExtraServings] = useState<FoodServing[]>([]);
   const [pending, startTransition] = useTransition();
+
+  const servingKey = (s: FoodServing) => `s:${Math.round(s.gramWeight)}|${s.label.toLowerCase()}`;
+
+  // Serving for the currently selected food (USDA hit or cached/quick row).
+  const selectedServing: FoodServing | null =
+    selectedUsda?.serving ?? selectedQuick?.serving ?? null;
+
+  // Unit options. All known servings first (branded serving + USDA portions),
+  // de-duplicated, then 100 g and raw grams. Each maps to grams so we always
+  // store grams under the hood.
+  const units = useMemo(() => {
+    const arr: { key: string; label: string; grams: number }[] = [];
+    const seen = new Set<string>();
+    const add = (s: FoodServing | null) => {
+      if (!s || s.gramWeight <= 0) return;
+      const key = servingKey(s);
+      if (seen.has(key)) return;
+      seen.add(key);
+      arr.push({ key, label: s.label, grams: s.gramWeight });
+    };
+    add(selectedServing);
+    extraServings.forEach(add);
+    arr.push({ key: "g100", label: "100 g", grams: 100 });
+    arr.push({ key: "g", label: "grams", grams: 1 });
+    return arr;
+  }, [selectedServing, extraServings]);
+
+  const activeUnit = units.find((u) => u.key === unitKey) ?? units[units.length - 1];
+  const gramsToLog = Math.max(1, Math.round((Number(quantity) || 0) * activeUnit.grams));
+
+  // Pick sensible defaults when a food is chosen. presetGrams (from a
+  // favorite/recent's remembered amount) wins; else 1 serving when known,
+  // else 100 g.
+  const applyDefaults = (serving: FoodServing | null, presetGrams?: number | null) => {
+    if (presetGrams != null && presetGrams > 0) {
+      setUnitKey("g");
+      setQuantity(String(Math.round(presetGrams)));
+    } else if (serving && serving.gramWeight > 0) {
+      setUnitKey(servingKey(serving));
+      setQuantity("1");
+    } else {
+      setUnitKey("g100");
+      setQuantity("1");
+    }
+  };
+
+  // Load household portions for a USDA food (by fdcId) and merge them in. If
+  // the food had no serving yet, adopt the first portion as its serving so it
+  // both defaults nicely and gets persisted with the food on add.
+  const loadPortions = async (fdcId: number | null, hadServing: boolean) => {
+    setExtraServings([]);
+    if (!fdcId) return;
+    try {
+      const res = await fetch(`/api/foods/portions?fdcId=${fdcId}`);
+      if (!res.ok) return;
+      const json = await res.json();
+      const portions: FoodServing[] = Array.isArray(json.portions) ? json.portions : [];
+      if (portions.length === 0) return;
+      setExtraServings(portions);
+      if (!hadServing) {
+        setSelectedUsda((prev) => (prev && !prev.serving ? { ...prev, serving: portions[0] } : prev));
+        applyDefaults(portions[0], null);
+      }
+    } catch {
+      /* ignore — fall back to 100 g / grams */
+    }
+  };
 
   // Hydrate from preselect on mount
   useEffect(() => {
     if (preselectQuickFood) {
+      const serving = preselectQuickFood.servingSizeG
+        ? { gramWeight: preselectQuickFood.servingSizeG, label: preselectQuickFood.servingLabel ?? `1 serving (${Math.round(preselectQuickFood.servingSizeG)} g)` }
+        : null;
       setSelectedQuick({
         foodId: preselectQuickFood.foodId,
         name: preselectQuickFood.name,
@@ -476,12 +550,14 @@ function FoodPicker({
         protein: preselectQuickFood.proteinGPer100,
         carbs: preselectQuickFood.carbsGPer100,
         fat: preselectQuickFood.fatGPer100,
+        serving,
       });
-      if (preselectQuickFood.defaultQuantityG) setQuantity(String(Math.round(preselectQuickFood.defaultQuantityG)));
+      applyDefaults(serving, preselectQuickFood.defaultQuantityG);
       if (preselectQuickFood.defaultMeal) setMeal(preselectQuickFood.defaultMeal);
     } else if (preselectScan) {
       if (preselectScan.kind === "cache") {
         const cf = preselectScan.food as CachedFood;
+        const serving = cf.serving ?? null;
         setSelectedQuick({
           foodId: cf.foodId,
           name: cf.name,
@@ -490,9 +566,15 @@ function FoodPicker({
           protein: cf.nutrients.proteinG,
           carbs: cf.nutrients.carbsG,
           fat: cf.nutrients.fatG,
+          serving,
         });
+        applyDefaults(serving, null);
+        loadPortions(cf.fdcId, !!serving);
       } else {
-        setSelectedUsda(preselectScan.food as UsdaFood);
+        const uf = preselectScan.food as UsdaFood;
+        setSelectedUsda(uf);
+        applyDefaults(uf.serving, null);
+        loadPortions(uf.fdcId, !!uf.serving);
       }
     }
   }, [preselectQuickFood, preselectScan]);
@@ -525,7 +607,7 @@ function FoodPicker({
   }, [query, selectedUsda, selectedQuick]);
 
   const addEntry = () => {
-    const q = Math.max(1, Math.round(Number(quantity) || 0));
+    const q = gramsToLog;
     startTransition(async () => {
       try {
         if (selectedQuick) {
@@ -591,7 +673,7 @@ function FoodPicker({
               {results.map((f) => (
                 <button
                   key={f.fdcId}
-                  onClick={() => setSelectedUsda(f)}
+                  onClick={() => { setSelectedUsda(f); applyDefaults(f.serving, null); loadPortions(f.fdcId, !!f.serving); }}
                   className="w-full text-left bg-white border border-slate-200 rounded-xl px-3 py-2 hover:border-teal-300 transition"
                 >
                   <div className="text-sm font-medium text-slate-900 truncate">
@@ -624,7 +706,7 @@ function FoodPicker({
         ) : (
           <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
             <button
-              onClick={() => { setSelectedUsda(null); setSelectedQuick(null); }}
+              onClick={() => { setSelectedUsda(null); setSelectedQuick(null); setExtraServings([]); }}
               className="text-xs text-teal-700"
             >
               ← Back to search
@@ -641,17 +723,31 @@ function FoodPicker({
                 {selectedFat != null ? ` ${Math.round(selectedFat)}g F` : ""}
               </div>
             </div>
-            <label className="block">
-              <span className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Amount (grams)</span>
-              <input
-                type="number"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                className="mt-1 w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-teal-500 tabular-nums"
-                inputMode="numeric"
-                min={1}
-              />
-            </label>
+            <div>
+              <span className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Amount</span>
+              <div className="mt-1 flex gap-2">
+                <input
+                  type="number"
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
+                  className="w-24 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-teal-500 tabular-nums"
+                  inputMode="decimal"
+                  min={0}
+                  step="any"
+                />
+                <select
+                  value={activeUnit.key}
+                  onChange={(e) => setUnitKey(e.target.value)}
+                  className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-teal-500"
+                >
+                  {units.map((u) => <option key={u.key} value={u.key}>{u.label}</option>)}
+                </select>
+              </div>
+              <div className="text-[11px] text-slate-500 mt-1 tabular-nums">
+                = {gramsToLog} g
+                {selectedKcal != null && ` · ${Math.round((selectedKcal * gramsToLog) / 100)} kcal`}
+              </div>
+            </div>
             <label className="block">
               <span className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Meal</span>
               <select

@@ -308,6 +308,8 @@ export type QuickFood = {
   fatGPer100: number | null;
   defaultQuantityG: number | null;
   defaultMeal: "breakfast" | "lunch" | "dinner" | "snack" | null;
+  servingSizeG: number | null;
+  servingLabel: string | null;
   isFavorite: boolean;
   lastUsedAt: string | null;
 };
@@ -319,7 +321,8 @@ export async function getFavoriteFoods(user: AuthUser, limit = 12): Promise<Quic
     sql`
       SELECT ff.id, ff.default_quantity_g, ff.default_meal, ff.updated_at,
              f.id AS food_id, f.name, f.brand,
-             f.kcal_per_100, f.protein_g_per_100, f.carbs_g_per_100, f.fat_g_per_100
+             f.kcal_per_100, f.protein_g_per_100, f.carbs_g_per_100, f.fat_g_per_100,
+             f.serving_size_g, f.serving_label
       FROM food_favorites ff
       JOIN foods f ON f.id = ff.food_id
       WHERE ff.patient_id = ${patientId}
@@ -338,6 +341,8 @@ export async function getFavoriteFoods(user: AuthUser, limit = 12): Promise<Quic
     fatGPer100: toNum(r.fat_g_per_100),
     defaultQuantityG: toNum(r.default_quantity_g),
     defaultMeal: r.default_meal,
+    servingSizeG: toNum(r.serving_size_g),
+    servingLabel: r.serving_label ?? null,
     isFavorite: true,
     lastUsedAt: r.updated_at,
   }));
@@ -354,7 +359,8 @@ export async function getRecentFoods(user: AuthUser, limit = 12): Promise<QuickF
   const entries = await withAuth(user, (sql) =>
     sql`
       SELECT fle.id, fle.meal, fle.quantity_g, fle.created_at, fle.food_id,
-             f.name, f.brand, f.kcal_per_100, f.protein_g_per_100, f.carbs_g_per_100, f.fat_g_per_100
+             f.name, f.brand, f.kcal_per_100, f.protein_g_per_100, f.carbs_g_per_100, f.fat_g_per_100,
+             f.serving_size_g, f.serving_label
       FROM food_log_entries fle
       JOIN food_logs fl ON fl.id = fle.food_log_id
       JOIN foods f ON f.id = fle.food_id
@@ -385,6 +391,8 @@ export async function getRecentFoods(user: AuthUser, limit = 12): Promise<QuickF
       fatGPer100: toNum(r.fat_g_per_100),
       defaultQuantityG: toNum(r.quantity_g),
       defaultMeal: r.meal,
+      servingSizeG: toNum(r.serving_size_g),
+      servingLabel: r.serving_label ?? null,
       isFavorite: false,
       lastUsedAt: r.created_at,
     });

@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
   // 1. Local cache hit
   const [cached] = await withAuth(user, (sql) =>
-    sql`SELECT id, source, source_id, name, brand, category, barcode, kcal_per_100, protein_g_per_100, carbs_g_per_100, fat_g_per_100, fiber_g_per_100, vitamin_d_iu_per_100, vitamin_b12_ug_per_100, iron_mg_per_100, magnesium_mg_per_100, calcium_mg_per_100, potassium_mg_per_100, sodium_mg_per_100, omega3_mg_per_100 FROM foods WHERE barcode = ${code} LIMIT 1`
+    sql`SELECT id, source, source_id, name, brand, category, barcode, serving_size_g, serving_label, kcal_per_100, protein_g_per_100, carbs_g_per_100, fat_g_per_100, fiber_g_per_100, vitamin_d_iu_per_100, vitamin_b12_ug_per_100, iron_mg_per_100, magnesium_mg_per_100, calcium_mg_per_100, potassium_mg_per_100, sodium_mg_per_100, omega3_mg_per_100 FROM foods WHERE barcode = ${code} LIMIT 1`
   );
 
   if (cached) {
@@ -63,6 +63,9 @@ function cachedToShape(row: any) {
     brand: row.brand ?? null,
     category: row.category ?? null,
     barcode: row.barcode ?? null,
+    serving: num(row.serving_size_g) != null
+      ? { gramWeight: num(row.serving_size_g) as number, label: (row.serving_label as string) ?? `1 serving (${Math.round(num(row.serving_size_g) as number)} g)` }
+      : null,
     nutrients: {
       kcal: num(row.kcal_per_100),
       proteinG: num(row.protein_g_per_100),

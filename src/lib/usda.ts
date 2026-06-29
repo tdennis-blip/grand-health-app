@@ -21,12 +21,19 @@
 // 629  PUFA 20:5 n-3 c,c,c,c,c (EPA) g
 // 631  PUFA 22:6 n-3 c,c,c,c,c,c (DHA) g
 
+export type FoodServing = {
+  gramWeight: number; // grams in one serving
+  label: string;      // human label, e.g. "1 container (170 g)"
+};
+
 export type UsdaFood = {
   fdcId: number;
   name: string;
   brand: string | null;
   category: string | null;
   barcode: string | null;
+  // Natural serving for unit-based logging, when USDA provides one.
+  serving: FoodServing | null;
   // All values are per 100g of the food.
   nutrients: {
     kcal: number | null;
@@ -108,6 +115,34 @@ function pickNutrients(arr: any[]): UsdaFood["nutrients"] {
   };
 }
 
+// Derive a natural serving (grams + label) for unit-based logging.
+// Priority: branded serving fields (best for packaged food), then the first
+// usable foodPortion (whole foods). Returns null when nothing usable.
+function pickServing(hit: any): FoodServing | null {
+  const size = num(hit.servingSize);
+  const unit = String(hit.servingSizeUnit ?? "").trim().toLowerCase();
+  const household = String(hit.householdServingFullText ?? "").trim();
+  // grams and milliliters (≈1 g/ml for most foods) are usable directly.
+  const massOrVol = ["g", "grm", "gram", "ml", "mlt", "milliliter"].includes(unit);
+  if (size != null && size > 0 && massOrVol) {
+    const grams = Math.round(size * 100) / 100;
+    const label = household ? `${household} (${Math.round(grams)} g)` : `1 serving (${Math.round(grams)} g)`;
+    return { gramWeight: grams, label };
+  }
+  // Whole-food portions (search sometimes includes these).
+  const portions = Array.isArray(hit.foodPortions) ? hit.foodPortions : [];
+  for (const p of portions) {
+    const g = num(p.gramWeight);
+    if (g != null && g > 0) {
+      const desc = String(
+        p.portionDescription || p.modifier || p.measureUnit?.name || "1 serving"
+      ).trim();
+      return { gramWeight: Math.round(g * 100) / 100, label: `${desc} (${Math.round(g)} g)` };
+    }
+  }
+  return null;
+}
+
 function mapHit(hit: any): UsdaFood {
   const rawBarcode = hit.gtinUpc ?? hit.gtin_upc ?? null;
   return {
@@ -116,6 +151,7 @@ function mapHit(hit: any): UsdaFood {
     brand: hit.brandOwner || hit.brandName || null,
     category: hit.foodCategory || hit.brandedFoodCategory || null,
     barcode: rawBarcode ? String(rawBarcode).replace(/\D/g, "") || null : null,
+    serving: pickServing(hit),
     nutrients: pickNutrients(hit.foodNutrients ?? []),
   };
 }
@@ -139,6 +175,64 @@ export async function searchUsdaFoods(query: string, pageSize = 15): Promise<Usd
   }
   const json = await res.json();
   return (json.foods ?? []).map(mapHit);
+}
+
+// Fetch the per-food household portions from USDA's detail endpoint
+// (/food/{fdcId}). The search endpoint omits foodPortions, so whole foods
+// (apple, oatmeal, chicken) only get real measures — "1 cup", "1 medium",
+// "1 slice" — from here. Returns a de-duplicated list of usable servings,
+// most common first, capped so the picker stays tidy. Never throws — returns
+// [] on any failure so the UI degrades gracefully to 100 g / grams.
+export async function getUsdaFoodPortions(fdcId: number): Promise<FoodServing[]> {
+  if (!fdcId || !Number.isFinite(fdcId)) return [];
+  const url = new URL(`${USDA_BASE}/food/${fdcId}`);
+  url.searchParams.set("api_key", apiKey());
+  try {
+    const res = await fetch(url.toString(), { cache: "no-store" });
+    if (!res.ok) return [];
+    const food = await res.json();
+
+    const out: FoodServing[] = [];
+    const seen = new Set<string>();
+    const push = (gram: number | null, label: string) => {
+      if (gram == null || gram <= 0) return;
+      const g = Math.round(gram * 100) / 100;
+      const key = `${Math.round(g)}|${label.toLowerCase()}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push({ gramWeight: g, label: `${label} (${Math.round(g)} g)` });
+    };
+
+    // Branded serving (if this is a branded food).
+    const bSize = num(food.servingSize);
+    const bUnit = String(food.servingSizeUnit ?? "").trim().toLowerCase();
+    const bHousehold = String(food.householdServingFullText ?? "").trim();
+    if (bSize != null && bSize > 0 && ["g", "grm", "gram", "ml", "mlt", "milliliter"].includes(bUnit)) {
+      push(bSize, bHousehold || "1 serving");
+    }
+
+    // Whole-food portions.
+    const portions = Array.isArray(food.foodPortions) ? food.foodPortions : [];
+    for (const p of portions) {
+      const g = num(p.gramWeight);
+      const amount = num(p.amount);
+      const unitName = p.measureUnit?.name && p.measureUnit.name !== "undetermined" ? String(p.measureUnit.name) : "";
+      const modifier = String(p.modifier ?? "").trim();
+      const desc = String(p.portionDescription ?? "").trim();
+      let label: string;
+      if (desc && desc.toLowerCase() !== "quantity not specified") {
+        label = desc;
+      } else {
+        const unit = unitName || modifier || "serving";
+        label = `${amount ?? 1} ${unit}`.trim();
+      }
+      push(g, label);
+    }
+
+    return out.slice(0, 6);
+  } catch {
+    return [];
+  }
 }
 
 // Barcode → UsdaFood, or null if no match in USDA's Branded set. USDA's

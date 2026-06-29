@@ -14,6 +14,7 @@ const usdaFoodSchema = z.object({
   brand: z.string().max(200).nullish(),
   category: z.string().max(200).nullish(),
   barcode: z.string().max(32).nullish(),
+  serving: z.object({ gramWeight: z.number(), label: z.string().max(160) }).nullish(),
   nutrients: z.object({
     kcal: z.number().nullish(),
     proteinG: z.number().nullish(),
@@ -69,10 +70,12 @@ async function ensureFood(user: AuthUser, food: z.infer<typeof usdaFoodSchema>):
   const [inserted] = await withAuth(user, (sql) =>
     sql`
       INSERT INTO foods (source, source_id, name, brand, category, barcode,
+        serving_size_g, serving_label,
         kcal_per_100, protein_g_per_100, carbs_g_per_100, fat_g_per_100, fiber_g_per_100,
         vitamin_d_iu_per_100, vitamin_b12_ug_per_100, iron_mg_per_100, magnesium_mg_per_100,
         calcium_mg_per_100, potassium_mg_per_100, sodium_mg_per_100, omega3_mg_per_100)
       VALUES ('usda', ${String(food.fdcId)}, ${food.name}, ${food.brand ?? null}, ${food.category ?? null}, ${food.barcode ?? null},
+        ${numOrNull(food.serving?.gramWeight ?? null)}, ${food.serving?.label ?? null},
         ${numOrNull(food.nutrients.kcal)}, ${numOrNull(food.nutrients.proteinG)}, ${numOrNull(food.nutrients.carbsG)},
         ${numOrNull(food.nutrients.fatG)}, ${numOrNull(food.nutrients.fiberG)},
         ${numOrNull(food.nutrients.vitaminDIu)}, ${numOrNull(food.nutrients.vitaminB12Ug)},
