@@ -10,7 +10,12 @@ const dietSchema = z.object({
   patientId: z.string().uuid(),
   rmrValue: z.number().int().min(800).max(5000).nullish(),
   rmrMethod: z.string().max(100).nullish(),
-  rmrMeasuredOn: z.string().nullish(),   // 'YYYY-MM-DD' or empty
+  // Accept a Date too (postgres-js returns date columns as Date objects) and
+  // normalize to 'YYYY-MM-DD' so a stray Date can't fail validation.
+  rmrMeasuredOn: z.preprocess(
+    (v) => (v instanceof Date ? v.toISOString().slice(0, 10) : v),
+    z.string().nullish()
+  ),
   rmrMeasuredBy: z.string().max(200).nullish(),
   activityMultiplier: z.number().min(1.0).max(2.5),
   activityMode: z.enum(["static", "dynamic", "threshold"]).default("static"),

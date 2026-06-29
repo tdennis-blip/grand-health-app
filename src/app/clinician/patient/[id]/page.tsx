@@ -94,7 +94,9 @@ export default async function PatientDetail({ params }: { params: Promise<{ id: 
         const t = deriveTargets({
           rmrValue: dietPlan.rmr_value,
           rmrMethod: dietPlan.rmr_method,
-          rmrMeasuredOn: dietPlan.rmr_measured_on,
+          rmrMeasuredOn: dietPlan.rmr_measured_on
+            ? new Date(dietPlan.rmr_measured_on).toISOString().slice(0, 10)
+            : null,
           rmrMeasuredBy: dietPlan.rmr_measured_by,
           activityMultiplier: Number(dietPlan.activity_multiplier),
           activityMode: (dietPlan.activity_mode === "dynamic" || dietPlan.activity_mode === "threshold") ? dietPlan.activity_mode : "static",
@@ -164,7 +166,9 @@ export default async function PatientDetail({ params }: { params: Promise<{ id: 
         initial={dietPlan ? {
           rmrValue: dietPlan.rmr_value,
           rmrMethod: dietPlan.rmr_method,
-          rmrMeasuredOn: dietPlan.rmr_measured_on,
+          rmrMeasuredOn: dietPlan.rmr_measured_on
+            ? new Date(dietPlan.rmr_measured_on).toISOString().slice(0, 10)
+            : null,
           rmrMeasuredBy: dietPlan.rmr_measured_by,
           activityMultiplier: Number(dietPlan.activity_multiplier),
           activityMode: (dietPlan.activity_mode === "dynamic" || dietPlan.activity_mode === "threshold") ? dietPlan.activity_mode : "static",
