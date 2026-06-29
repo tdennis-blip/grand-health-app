@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { jwtVerify, createRemoteJWKSet } from "jose";
 import { cognitoConfig } from "./config";
 import { cache } from "react";
+import { serviceRoleSql } from "@/lib/db/connection";
 
 export type AuthUser = {
   id: string;           // Cognito sub (UUID) — maps to profiles.id
@@ -59,6 +60,21 @@ export async function getUser(): Promise<AuthUser | null> {
   }
 }
 
+// Does a profile row exist for this id? A valid token whose `sub` has no
+// profile is an orphaned session (e.g. the account was deleted) — we treat it
+// as signed-out rather than rendering an empty shell. Cached per request.
+// On any DB error we return true so a transient outage never locks users out.
+const profileExists = cache(async (id: string): Promise<boolean> => {
+  try {
+    const rows = await serviceRoleSql<{ one: number }[]>`
+      SELECT 1 AS one FROM public.profiles WHERE id = ${id} LIMIT 1
+    `;
+    return rows.length > 0;
+  } catch {
+    return true;
+  }
+});
+
 // Convenience: throws a redirect if not authenticated.
 // Use in Server Components/Actions that require auth.
 export async function requireUser(): Promise<AuthUser> {
@@ -66,6 +82,11 @@ export async function requireUser(): Promise<AuthUser> {
   if (!user) {
     const { redirect } = await import("next/navigation");
     redirect("/login");
+  }
+  // Orphaned session: token is valid but the profile is gone → full sign-out.
+  if (!(await profileExists(user!.id))) {
+    const { redirect } = await import("next/navigation");
+    redirect("/auth/force-signout");
   }
   return user as AuthUser;
 }

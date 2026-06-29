@@ -16,6 +16,7 @@ import {
 import { FoodLogger } from "./food-logger";
 import { getSupplementMicrosForDate } from "@/lib/medications";
 import { AIDietPlan } from "./ai-plan";
+import { DietModeToggle, CollapsibleLogger } from "./diet-mode";
 
 export default async function PatientDiet() {
   const user = await requirePatient();
@@ -28,10 +29,11 @@ export default async function PatientDiet() {
     getFavoriteFoods(user, 12),
     getRecentFoods(user, 12),
     getSupplementMicrosForDate(user.id, todayIso, user),
-    withAuth(user, (sql) => sql`SELECT dietary_preferences FROM patient_profiles WHERE profile_id = ${user.id} LIMIT 1`),
+    withAuth(user, (sql) => sql`SELECT dietary_preferences, diet_view_mode FROM patient_profiles WHERE profile_id = ${user.id} LIMIT 1`),
   ]);
 
   const hasPreferences = !!patientProfile?.dietary_preferences;
+  const viewMode: "tracking" | "targets" = patientProfile?.diet_view_mode === "targets" ? "targets" : "tracking";
 
   const foodTotals = sumTotals(entries);
   // Merge supplement micronutrients into food totals for the micro grid.
@@ -56,11 +58,14 @@ export default async function PatientDiet() {
       <Link href="/home" className="text-sm text-teal-700 inline-flex items-center gap-1">
         <ChevronLeft size={14} /> Home
       </Link>
-      <header>
-        <div className="text-xs uppercase tracking-wide text-slate-500">Today's targets</div>
-        <div className="text-xl font-semibold text-slate-900 flex items-center gap-1.5">
-          <Apple size={18} className="text-orange-600" /> Diet
+      <header className="flex items-end justify-between gap-2">
+        <div>
+          <div className="text-xs uppercase tracking-wide text-slate-500">Today's targets</div>
+          <div className="text-xl font-semibold text-slate-900 flex items-center gap-1.5">
+            <Apple size={18} className="text-orange-600" /> Diet
+          </div>
         </div>
+        {targets && <DietModeToggle current={viewMode} />}
       </header>
 
       {!targets ? (
@@ -190,7 +195,24 @@ export default async function PatientDiet() {
             </section>
           )}
 
-          {/* Today logged vs target — progress bars */}
+          {/* Targets-only emphasis: protein + fiber front and center */}
+          {viewMode === "targets" && (
+            <section className="grid grid-cols-2 gap-2">
+              <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4">
+                <div className="text-[10px] uppercase tracking-wide text-teal-700 font-semibold">Protein / day</div>
+                <div className="text-3xl font-semibold text-teal-900 tabular-nums mt-0.5">{targets.proteinG}g</div>
+                <div className="text-[11px] text-teal-700/80 mt-1 leading-snug">Aim to hit this every day — protein protects muscle.</div>
+              </div>
+              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
+                <div className="text-[10px] uppercase tracking-wide text-emerald-700 font-semibold">Fiber / day</div>
+                <div className="text-3xl font-semibold text-emerald-900 tabular-nums mt-0.5">{targets.fiberG}g</div>
+                <div className="text-[11px] text-emerald-700/80 mt-1 leading-snug">Most people fall short — make this a daily goal.</div>
+              </div>
+            </section>
+          )}
+
+          {/* Today logged vs target — progress bars (tracking mode) */}
+          {viewMode === "tracking" && (
           <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div>
@@ -211,16 +233,27 @@ export default async function PatientDiet() {
             <ProgressBar label="Fat"     value={totals.fatG}     target={targets.fatG}     color="bg-rose-500"  suffix="g" />
             <ProgressBar label="Fiber"   value={totals.fiberG}   target={targets.fiberG}   color="bg-emerald-500" suffix="g" />
           </section>
+          )}
 
-          {/* The logger itself — search USDA + per-meal entries */}
-          <FoodLogger
-            logDate={todayIso}
-            entries={entries}
-            favorites={favorites}
-            recents={recentFoods}
-          />
+          {/* The logger — full in tracking mode, tucked away in targets mode */}
+          {viewMode === "tracking" ? (
+            <FoodLogger
+              logDate={todayIso}
+              entries={entries}
+              favorites={favorites}
+              recents={recentFoods}
+            />
+          ) : (
+            <CollapsibleLogger
+              logDate={todayIso}
+              entries={entries}
+              favorites={favorites}
+              recents={recentFoods}
+            />
+          )}
 
-          {/* Micronutrient summary */}
+          {/* Micronutrient summary (tracking mode) */}
+          {viewMode === "tracking" && (
           <section className="bg-white rounded-2xl border border-slate-200 p-4">
             <div className="flex items-baseline justify-between mb-3">
               <div className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Today's micronutrients</div>
@@ -237,6 +270,7 @@ export default async function PatientDiet() {
               })}
             </div>
           </section>
+          )}
 
           {/* AI meal planner */}
           <AIDietPlan hasPreferences={hasPreferences} />
@@ -255,11 +289,13 @@ export default async function PatientDiet() {
             <SmallTile label="Water" icon={<Droplet size={11} className="text-blue-500" />} value={`${targets.waterL}L`} />
           </section>
 
-          {/* Recent 7 days */}
+          {/* Recent 7 days (tracking mode) */}
+          {viewMode === "tracking" && (
           <section className="bg-white rounded-2xl border border-slate-200 p-4">
             <div className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold mb-2">Last 7 days</div>
             <RecentStrip slots={slots} goalKcal={targets.goalKcal} />
           </section>
+          )}
 
           {/* Clinician note */}
           {targets.notes && (
