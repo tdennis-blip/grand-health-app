@@ -419,14 +419,35 @@ function Field({ label, type, value, onChange, placeholder }: { label: string; t
 }
 
 function NumField({ label, value, onChange, step, hint }: { label: string; value: number; onChange: (v: number) => void; step?: string; hint?: string }) {
+  // Local text buffer so the user can type "-", clear the field, or hold an
+  // in-progress value (e.g. "-3") without it being coerced to 0 each keystroke.
+  const [text, setText] = useState<string>(String(value));
+  // Re-sync when the parent value changes from outside (e.g. preset buttons).
+  if (Number(text) !== value && !(text === "" || text === "-" || text.endsWith("."))) {
+    setText(String(value));
+  }
   return (
     <label className="block">
       <Label>{label}</Label>
       <input
-        type="number"
+        type="text"
+        inputMode="numeric"
         step={step ?? "1"}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value) || 0)}
+        value={text}
+        onChange={(e) => {
+          const raw = e.target.value;
+          // Allow empty / lone minus / decimal-in-progress without committing.
+          if (raw === "" || raw === "-") {
+            setText(raw);
+            onChange(0);
+            return;
+          }
+          if (/^-?\d*\.?\d*$/.test(raw)) {
+            setText(raw);
+            const n = Number(raw);
+            if (Number.isFinite(n)) onChange(n);
+          }
+        }}
         className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-teal-500 tabular-nums"
       />
       {hint && <div className="text-[10px] text-slate-500 mt-1">{hint}</div>}

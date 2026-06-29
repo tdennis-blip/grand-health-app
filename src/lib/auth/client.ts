@@ -4,6 +4,8 @@ import {
   signIn as amplifySignIn,
   signOut as amplifySignOut,
   confirmSignIn as amplifyConfirmSignIn,
+  resetPassword as amplifyResetPassword,
+  confirmResetPassword as amplifyConfirmResetPassword,
   fetchAuthSession,
   type SignInInput,
 } from "aws-amplify/auth";
@@ -60,4 +62,23 @@ export async function confirmNewPassword(newPassword: string) {
 
 export async function signOut() {
   await amplifySignOut();
+}
+
+// Step 1 of password recovery: Cognito emails a verification code to the
+// account's verified email. Throws on unknown user / unverified email.
+export async function requestPasswordReset(email: string) {
+  return amplifyResetPassword({ username: email });
+}
+
+// Step 2: submit the emailed code + the new password.
+export async function confirmPasswordReset(
+  email: string,
+  confirmationCode: string,
+  newPassword: string
+) {
+  return amplifyConfirmResetPassword({
+    username: email,
+    confirmationCode,
+    newPassword,
+  });
 }

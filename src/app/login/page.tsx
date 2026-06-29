@@ -1,7 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { configureAmplify, signInWithPassword, confirmNewPassword, getIdToken } from "@/lib/auth/client";
+import {
+  configureAmplify,
+  signInWithPassword,
+  confirmNewPassword,
+  getIdToken,
+  requestPasswordReset,
+  confirmPasswordReset,
+} from "@/lib/auth/client";
 
 configureAmplify();
 
@@ -15,6 +22,74 @@ export default function LoginPage() {
   const [needNewPassword, setNeedNewPassword] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+
+  // Password recovery flow: 'request' (email a code) → 'confirm' (code + new pw).
+  const [view, setView] = useState<"signin" | "forgotRequest" | "forgotConfirm">("signin");
+  const [resetCode, setResetCode] = useState("");
+  const [info, setInfo] = useState<string | null>(null);
+
+  const goTo = (v: "signin" | "forgotRequest" | "forgotConfirm") => {
+    setView(v);
+    setStatus("idle");
+    setErrorMsg(null);
+    setInfo(null);
+  };
+
+  const handleForgotRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setStatus("sending");
+    setErrorMsg(null);
+    setInfo(null);
+    try {
+      await requestPasswordReset(email.trim());
+      setStatus("idle");
+      setView("forgotConfirm");
+      setInfo(`We sent a 6-digit code to ${email.trim()}. Enter it below with your new password.`);
+    } catch (err: unknown) {
+      // Don't reveal whether an account exists — generic guidance, still advance.
+      const name = err instanceof Error ? err.name : "";
+      if (name === "LimitExceededException") {
+        setStatus("error");
+        setErrorMsg("Too many attempts. Please wait a few minutes and try again.");
+      } else {
+        setStatus("idle");
+        setView("forgotConfirm");
+        setInfo(`If an account exists for ${email.trim()}, a code has been sent. Enter it below with your new password.`);
+      }
+    }
+  };
+
+  const handleForgotConfirm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword.length < 8) {
+      setStatus("error");
+      setErrorMsg("Password must be at least 8 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setStatus("error");
+      setErrorMsg("Passwords don't match.");
+      return;
+    }
+    setStatus("sending");
+    setErrorMsg(null);
+    try {
+      await confirmPasswordReset(email.trim(), resetCode.trim(), newPassword);
+      setNewPassword("");
+      setConfirmPassword("");
+      setResetCode("");
+      setPassword("");
+      goTo("signin");
+      setInfo("Password updated. Sign in with your new password.");
+    } catch (err: unknown) {
+      setStatus("error");
+      const name = err instanceof Error ? err.name : "";
+      if (name === "CodeMismatchException") setErrorMsg("That code is incorrect. Check the email and try again.");
+      else if (name === "ExpiredCodeException") setErrorMsg("That code has expired. Request a new one.");
+      else if (name === "InvalidPasswordException") setErrorMsg("Password doesn't meet requirements (8+ chars, with letters and numbers).");
+      else setErrorMsg(err instanceof Error ? err.message : "Couldn't reset password.");
+    }
+  };
 
   // Token → httpOnly cookie → full nav so middleware routes to the role home.
   const finish = async (): Promise<boolean> => {
@@ -96,12 +171,112 @@ export default function LoginPage() {
           <div>
             <div className="font-semibold tracking-tight">Grand Health</div>
             <div className="text-[11px] text-slate-500 -mt-0.5">
-              {needNewPassword ? "Set your password" : "Sign in to continue"}
+              {needNewPassword
+                ? "Set your password"
+                : view === "forgotRequest"
+                ? "Reset your password"
+                : view === "forgotConfirm"
+                ? "Enter your code"
+                : "Sign in to continue"}
             </div>
           </div>
         </div>
 
-        {!needNewPassword ? (
+        {info && (
+          <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-2">{info}</div>
+        )}
+
+        {view === "forgotRequest" ? (
+          <form onSubmit={handleForgotRequest} className="space-y-3">
+            <p className="text-[12px] text-slate-600 leading-snug">
+              Enter your account email and we&apos;ll send a verification code to reset your password.
+            </p>
+            <label className="block">
+              <span className="text-[11px] uppercase tracking-wide text-slate-500 font-medium">Email</span>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="mt-1 w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-teal-500"
+              />
+            </label>
+            {errorMsg && (
+              <div className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg p-2">{errorMsg}</div>
+            )}
+            <button
+              type="submit"
+              disabled={status === "sending"}
+              className="w-full bg-teal-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-teal-800 disabled:opacity-60"
+            >
+              {status === "sending" ? "Sending code…" : "Send reset code"}
+            </button>
+            <button
+              type="button"
+              onClick={() => goTo("signin")}
+              className="w-full text-[12px] text-slate-500 hover:text-slate-700"
+            >
+              ← Back to sign in
+            </button>
+          </form>
+        ) : view === "forgotConfirm" ? (
+          <form onSubmit={handleForgotConfirm} className="space-y-3">
+            <label className="block">
+              <span className="text-[11px] uppercase tracking-wide text-slate-500 font-medium">Verification code</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                required
+                value={resetCode}
+                onChange={(e) => setResetCode(e.target.value)}
+                placeholder="123456"
+                className="mt-1 w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-teal-500 tracking-widest"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[11px] uppercase tracking-wide text-slate-500 font-medium">New password</span>
+              <input
+                type="password"
+                required
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="At least 8 characters"
+                className="mt-1 w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-teal-500"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[11px] uppercase tracking-wide text-slate-500 font-medium">Confirm password</span>
+              <input
+                type="password"
+                required
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+                className="mt-1 w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-teal-500"
+              />
+            </label>
+            {errorMsg && (
+              <div className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg p-2">{errorMsg}</div>
+            )}
+            <button
+              type="submit"
+              disabled={status === "sending"}
+              className="w-full bg-teal-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-teal-800 disabled:opacity-60"
+            >
+              {status === "sending" ? "Updating…" : "Set new password"}
+            </button>
+            <div className="flex items-center justify-between">
+              <button type="button" onClick={() => goTo("forgotRequest")} className="text-[12px] text-slate-500 hover:text-slate-700">
+                Resend code
+              </button>
+              <button type="button" onClick={() => goTo("signin")} className="text-[12px] text-slate-500 hover:text-slate-700">
+                ← Back to sign in
+              </button>
+            </div>
+          </form>
+        ) : !needNewPassword ? (
           <form onSubmit={handleSubmit} className="space-y-3">
             <label className="block">
               <span className="text-[11px] uppercase tracking-wide text-slate-500 font-medium">Email</span>
@@ -134,6 +309,13 @@ export default function LoginPage() {
               className="w-full bg-teal-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-teal-800 disabled:opacity-60"
             >
               {status === "sending" ? "Signing in…" : "Sign in"}
+            </button>
+            <button
+              type="button"
+              onClick={() => goTo("forgotRequest")}
+              className="w-full text-center text-[12px] text-teal-700 hover:text-teal-800 font-medium"
+            >
+              Forgot password?
             </button>
             <p className="text-[11px] text-slate-500 leading-snug">
               Patients and clinicians use the same login — your role is set by your clinician.
