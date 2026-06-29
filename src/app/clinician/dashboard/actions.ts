@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireClinician } from "@/lib/auth/server";
 import { serviceRoleSql } from "@/lib/db/connection";
 import { recordAudit } from "@/lib/audit";
+import { isAdminClinician } from "@/lib/care-team";
 import { createCognitoUser, deleteCognitoUser, EmailInUseError } from "@/lib/cognito-admin";
 
 const createUserSchema = z.object({
@@ -60,6 +61,15 @@ export async function createUserAccount(input: z.infer<typeof createUserSchema>)
         VALUES (${sub}, ${clinicId}, ${primaryClinicianId})
         ON CONFLICT (profile_id) DO NOTHING
       `;
+      // Auto-add the creating clinician to the new patient's care team UNLESS
+      // they're an admin (admins see everyone and want to join explicitly).
+      if (primaryClinicianId && !(await isAdminClinician(user.id))) {
+        await serviceRoleSql`
+          INSERT INTO public.patient_care_team (clinic_id, patient_id, clinician_id, added_by)
+          VALUES (${clinicId}, ${sub}, ${user.id}, ${user.id})
+          ON CONFLICT (patient_id, clinician_id) DO NOTHING
+        `;
+      }
     } else {
       await serviceRoleSql`
         INSERT INTO public.clinician_profiles (profile_id, clinic_id, title, credentials)

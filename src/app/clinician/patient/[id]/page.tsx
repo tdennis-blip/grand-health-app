@@ -14,10 +14,13 @@ import { StackSummaryCard } from "./stack/stack-summary-card";
 import { AppointmentsCard } from "./appointments/appointments-card";
 import { getPatientAppointmentsForClinician, getClinicAppointmentTypes } from "@/lib/appointments";
 import { RemovePatientButton } from "./remove-patient";
+import { canAccessPatient, isAdminClinician, getCareTeam, getClinicClinicians } from "@/lib/care-team";
+import { CareTeamCard } from "./care-team/care-team-card";
 
 export default async function PatientDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await requireClinician();
+  const access = await canAccessPatient(user, id);
   const [patientRaw] = await withAuth(user, (sql) =>
     sql`
       SELECT pp.profile_id, pp.date_of_birth, pp.sex, pp.height_cm, pp.weight_kg,
@@ -36,7 +39,7 @@ export default async function PatientDetail({ params }: { params: Promise<{ id: 
     weight_kg: patientRaw.weight_kg,
   } : null;
 
-  if (!patient) {
+  if (!patient || !access) {
     return (
       <main className="max-w-3xl mx-auto px-6 py-6">
         <Link href="/clinician/dashboard" className="text-sm text-teal-700">&larr; Back</Link>
@@ -44,6 +47,12 @@ export default async function PatientDetail({ params }: { params: Promise<{ id: 
       </main>
     );
   }
+
+  const [isAdmin, careTeam, clinicClinicians] = await Promise.all([
+    isAdminClinician(user.id),
+    getCareTeam(id),
+    getClinicClinicians(user.clinicId),
+  ]);
 
   const [pillars, dietPlanRows, grand100Baseline_rows, g100Activities, g100Targets,
          recentLogs, patientAppointments, customApptTypes] = await Promise.all([
@@ -155,6 +164,14 @@ export default async function PatientDetail({ params }: { params: Promise<{ id: 
         <Kv k="Height" v={patient.height_cm ? `${patient.height_cm} cm` : "—"} />
         <Kv k="Weight" v={patient.weight_kg ? `${patient.weight_kg} kg` : "—"} />
       </div>
+
+      <CareTeamCard
+        patientId={id}
+        currentUserId={user.id}
+        isAdmin={isAdmin}
+        members={careTeam.map((m) => ({ clinicianId: m.clinicianId, name: `${m.firstName ?? ""} ${m.lastName ?? ""}`.trim() || "(unnamed)", role: m.professionalRole || m.roleLabel || m.title || null, credentials: m.credentials }))}
+        clinicClinicians={clinicClinicians.map((m) => ({ clinicianId: m.clinicianId, name: `${m.firstName ?? ""} ${m.lastName ?? ""}`.trim() || "(unnamed)", role: m.professionalRole || m.roleLabel || m.title || null, credentials: m.credentials }))}
+      />
 
       <WearableTrendCard patientId={id} />
 

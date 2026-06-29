@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { requireClinician } from "@/lib/auth/server";
 import { withAuth } from "@/lib/db/connection";
+import { isAdminClinician } from "@/lib/care-team";
 import { AddUserButton } from "./add-user";
 
 type RosterRow = {
@@ -16,15 +17,28 @@ type RosterRow = {
 
 export default async function ClinicianDashboard() {
   const user = await requireClinician();
+  const isAdmin = await isAdminClinician(user.id);
 
-  const rosterRaw = await withAuth(user, (sql) =>
-    sql`
-      SELECT pp.profile_id, pp.member_since, p.email, p.first_name, p.last_name
-      FROM patient_profiles pp
-      JOIN profiles p ON p.id = pp.profile_id
-      ORDER BY pp.member_since DESC
-    `
-  );
+  // Admins see the whole clinic; everyone else sees only patients whose care
+  // team they're on.
+  const rosterRaw = isAdmin
+    ? await withAuth(user, (sql) =>
+        sql`
+          SELECT pp.profile_id, pp.member_since, p.email, p.first_name, p.last_name
+          FROM patient_profiles pp
+          JOIN profiles p ON p.id = pp.profile_id
+          ORDER BY pp.member_since DESC
+        `
+      )
+    : await withAuth(user, (sql) =>
+        sql`
+          SELECT pp.profile_id, pp.member_since, p.email, p.first_name, p.last_name
+          FROM patient_profiles pp
+          JOIN profiles p ON p.id = pp.profile_id
+          JOIN patient_care_team ct ON ct.patient_id = pp.profile_id AND ct.clinician_id = ${user.id}
+          ORDER BY pp.member_since DESC
+        `
+      );
 
   const rows: RosterRow[] = rosterRaw.map((r: any) => ({
     profile_id: r.profile_id,
