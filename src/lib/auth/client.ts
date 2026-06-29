@@ -6,6 +6,9 @@ import {
   confirmSignIn as amplifyConfirmSignIn,
   resetPassword as amplifyResetPassword,
   confirmResetPassword as amplifyConfirmResetPassword,
+  updatePassword as amplifyUpdatePassword,
+  updateUserAttributes as amplifyUpdateUserAttributes,
+  confirmUserAttribute as amplifyConfirmUserAttribute,
   fetchAuthSession,
   type SignInInput,
 } from "aws-amplify/auth";
@@ -81,4 +84,24 @@ export async function confirmPasswordReset(
     confirmationCode,
     newPassword,
   });
+}
+
+// Change password while signed in (requires the current password).
+export async function changePassword(oldPassword: string, newPassword: string) {
+  return amplifyUpdatePassword({ oldPassword, newPassword });
+}
+
+// Step 1 of an email change: Cognito sends a verification code to the NEW
+// address. Returns the per-attribute next step so the caller knows whether a
+// code is required.
+export async function requestEmailChange(newEmail: string) {
+  const res = await amplifyUpdateUserAttributes({
+    userAttributes: { email: newEmail },
+  });
+  return res.email?.nextStep?.updateAttributeStep ?? "DONE";
+}
+
+// Step 2: confirm the email change with the code sent to the new address.
+export async function confirmEmailChange(confirmationCode: string) {
+  return amplifyConfirmUserAttribute({ userAttributeKey: "email", confirmationCode });
 }

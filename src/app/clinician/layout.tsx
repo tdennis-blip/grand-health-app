@@ -71,10 +71,10 @@ export default async function ClinicianLayout({
             </Link>
           </nav>
           <div className="flex items-center gap-3 text-sm flex-shrink-0">
-            <div className="text-slate-600 hidden sm:block text-right leading-tight">
+            <Link href="/clinician/settings/profile" className="text-slate-600 hidden sm:block text-right leading-tight hover:text-slate-900" title="My profile">
               <div>{profile.first_name} {profile.last_name}</div>
               {roleLabel && <div className="text-[11px] text-slate-400">{roleLabel}</div>}
-            </div>
+            </Link>
             <SignOutButton className="text-xs font-semibold text-slate-700 bg-white border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-50" />
           </div>
         </div>
