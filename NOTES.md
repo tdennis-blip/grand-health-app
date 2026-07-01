@@ -44,6 +44,37 @@ All shipped via `git push` + manual deploy workflow (still no auto-deploy). Veri
 
 ---
 
+## ✅ DONE 2026-06-30 — care-team patient access locked down at the DB (RLS)
+
+Now genuinely enforced in the database, not just the app. **Key discovery:** the app was connecting as `grandhealth`, which OWNS the tables, so RLS was *inert* (owner bypasses RLS; `force_rls` off) — all prior scoping was app-query-only. **Fix = role split:**
+- New non-owner login role **`grandhealth_app`** (member of `authenticated`, so it inherits table grants + `to authenticated` policies apply, but being a non-owner it IS subject to RLS). Created via `docs/setup-app-role.sql`. Its password lives in the `DATABASE_URL` secret (reachable only inside the VPC).
+- The app's **`DATABASE_URL` secret now points at `grandhealth_app`**; `SERVICE_ROLE_DATABASE_URL` stays `grandhealth` (owner) so `serviceRoleSql` keeps bypassing RLS for cron/webhooks/admin writes/care-team helpers. Cut over via secret put + `force-new-deployment`.
+- **Migration 0032**: helpers `current_user_is_admin()` + `clinician_can_access_patient(uuid)` (SECURITY DEFINER), plus **RESTRICTIVE** `ct_restrict` policies on all patient-bearing PHI tables (+ `food_log_entries`/`patient_activity_sets` via parent EXISTS). Restrictive = ANDs on top of existing permissive policies, only narrowing. Predicate: `patient_id = current_user_id() OR clinician_can_access_patient(patient_id)`.
+- **Validated** as `grandhealth_app` via `docs/rls-care-team-test.sql` (BEGIN/ROLLBACK): unassigned clinician → 0; admin → all; patient → own only + self-insert OK; assigned clinician → visible. Smoke-tested live: admin sees roster, patient loads.
+- **Rollback if needed:** restore `AWSPREVIOUS` secret version + redeploy (flips `DATABASE_URL` back to `grandhealth`).
+- **Deliberately NOT covered:** `audit_log` (compliance viewer, still clinic-wide) and clinic library/config tables (shared). Revisit audit_log scoping separately if needed.
+- **Behavioral note:** existing non-admin clinicians now see zero patients until assigned to a care team. tdennis (admin) sees all.
+
+---
+
+## 📋 Session log 2026-06-29 (part 2) — food serving units, calm diet mode, auth hardening, provider profile, care teams
+
+**Food logger logs by serving, not just grams (migration 0028).** `foods.serving_size_g` + `serving_label`. `usda.ts` extracts a serving from branded fields (`mapHit`→`pickServing`) and `getUsdaFoodPortions(fdcId)` pulls real household portions ("1 cup", "1 medium") from the **detail** endpoint (`/food/{fdcId}`; search omits them). New `/api/foods/portions` route. FoodPicker now has a unit dropdown (serving + USDA portions + 100 g + grams), defaults to **1 serving**, converts to grams under the hood (stored `quantity_g` unchanged). Serving flows through search, barcode, favorites/recents. Cached foods backfill serving on next fetch.
+
+**"Targets only" diet mode (migration 0029, `patient_profiles.diet_view_mode`).** Patient-toggled (Tracking / Targets only) on their Diet screen. Targets mode emphasizes **Protein** + **Fiber** (big cards), keeps the goal headline (incl. activity-added kcal), macros, water/meals, clinician note, AI plan; hides progress bars / micros / 7-day strip; logger tucked behind a "Log a food" link (`diet-mode.tsx` + `view-actions.ts`). Patient self-update allowed (not a protected column).
+
+**Auth: orphaned-session guard.** `requireUser` now checks the token's `sub` has a profile (cached, fails-open on DB error); if not → `/auth/force-signout` (new route) clears gh_id_token + Amplify cookies → `/login`. Fixes the "logged into a deleted profile, empty shell" problem. Also: self-service password reset shipped earlier today; provider can change password/email from their profile.
+
+**Provider profile editor (migration 0030, `clinician_profiles.professional_role`).** `/clinician/settings/profile` (reached by clicking your name top-right): edit name, professional role, title, credentials (service-role write scoped to self); change password (Cognito `updatePassword`); change email (Cognito `updateUserAttributes`+`confirmUserAttribute` with code, then sync `profiles`/`auth.users`). Wrappers in `lib/auth/client.ts`.
+
+**Patient "Me" → "Your team".** Was a single "Your clinician" stand-in; now lists the assigned care team with roles + a "Your clinician" badge for the primary.
+
+**⭐ Care-team model (migration 0031) — APP-LEVEL ONLY (see TOP PRIORITY above).** `patient_care_team` (patient↔clinician, many-to-many) + `clinician_profiles.is_admin` (true for `tdennis@mygrandhealth.com`). Helpers in `lib/care-team.ts` (`isAdminClinician`, `canAccessPatient`, `getCareTeam`, `getClinicClinicians`). Dashboard roster: admin → all clinic patients; else → only care-team patients. Patient detail page blocks non-admins not on the team. **Care team card** on the patient page: "Assign me", self-remove; admins add/remove anyone. Non-admin who creates a patient is auto-added; admin is not (joins explicitly). Assignment is self-or-admin, audited. **Caveat:** after deploy, existing non-admin clinicians see zero patients until assigned; admin (you) unaffected.
+
+**Migrations to run on staging (in order): 0030, 0031** (0026–0029 already applied this session). All code typechecks clean on real `src/`.
+
+---
+
 ## 📋 Session log 2026-06-16 — feature work after go-live
 
 **Shipped & deployed (migrations run on staging):**

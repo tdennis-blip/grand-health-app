@@ -5,7 +5,7 @@ import { ProgramAssignments } from "./program-assignments";
 import { DietPlanCard } from "./diet/diet-plan-card";
 import { AdherencePanel } from "./diet/adherence-panel";
 import { getRecentFoodLogs, buildDaySlots, deriveTargets } from "@/lib/diet";
-import { PillarVisibilityToggle } from "./pillar/pillar-visibility-toggle";
+import { PillarManager } from "./pillar/pillar-manager";
 import { Grand100BaselineCard } from "./grand100/grand100-baseline-card";
 import { TargetAgesCard, type TargetRow } from "./grand100/target-ages-card";
 import { ageFromDob } from "@/lib/grand100";
@@ -233,55 +233,10 @@ export default async function PatientDetail({ params }: { params: Promise<{ id: 
         programs={programs.map((p: any) => ({ id: p.id, name: p.name }))}
       />
 
-      <div>
-        <div className="text-sm font-semibold text-slate-900 mb-2">Pillars</div>
-        <div className="text-[11px] text-slate-500 mb-2">
-          Click any pillar to edit. Toggle visibility to show or hide a pillar in the patient&apos;s app.
-        </div>
-        <div className="space-y-2">
-          {(pillars || []).map((p: any) => (
-            <div
-              key={p.id}
-              className={`rounded-xl border p-3 transition ${
-                p.hidden ? "bg-slate-50 border-slate-200 opacity-70" : "bg-white border-slate-200 hover:border-teal-300"
-              }`}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <Link
-                  href={`/clinician/patient/${id}/pillar/${p.id}`}
-                  className="flex-1 min-w-0"
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="text-sm font-semibold text-slate-900 truncate">{p.name}</div>
-                    {p.hidden && (
-                      <span className="text-[10px] uppercase tracking-wide font-semibold text-slate-500 bg-slate-200 border border-slate-300 px-1.5 py-0.5 rounded-full">
-                        Hidden
-                      </span>
-                    )}
-                  </div>
-                  {p.description && <div className="text-[11px] text-slate-500 line-clamp-2">{p.description}</div>}
-                </Link>
-                <div className="flex items-center gap-3 flex-shrink-0">
-                  <PillarVisibilityToggle
-                    pillarId={p.id}
-                    patientId={id}
-                    hidden={p.hidden}
-                  />
-                  <Link
-                    href={`/clinician/patient/${id}/pillar/${p.id}`}
-                    className="text-teal-700 text-xs"
-                  >
-                    Edit →
-                  </Link>
-                </div>
-              </div>
-            </div>
-          ))}
-          {(!pillars || pillars.length === 0) && (
-            <div className="text-sm text-slate-500 italic">No pillars yet for this patient.</div>
-          )}
-        </div>
-      </div>
+      <PillarManager
+        patientId={id}
+        pillars={(pillars || []).map((p: any) => ({ id: p.id, name: p.name, description: p.description, hidden: p.hidden }))}
+      />
 
       <RemovePatientButton
         patientId={id}

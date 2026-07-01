@@ -6,6 +6,7 @@ import { requireClinician } from "@/lib/auth/server";
 import { serviceRoleSql } from "@/lib/db/connection";
 import { recordAudit } from "@/lib/audit";
 import { isAdminClinician } from "@/lib/care-team";
+import { seedDefaultPillars } from "@/lib/default-pillars";
 import { createCognitoUser, deleteCognitoUser, EmailInUseError } from "@/lib/cognito-admin";
 
 const createUserSchema = z.object({
@@ -70,6 +71,8 @@ export async function createUserAccount(input: z.infer<typeof createUserSchema>)
           ON CONFLICT (patient_id, clinician_id) DO NOTHING
         `;
       }
+      // Give the new patient the default pillars + starter factors.
+      await seedDefaultPillars(clinicId, sub).catch(() => undefined);
     } else {
       await serviceRoleSql`
         INSERT INTO public.clinician_profiles (profile_id, clinic_id, title, credentials)
