@@ -24,37 +24,52 @@ const getJWKS = cache(() => createRemoteJWKSet(new URL(JWKS_URL)));
 export async function getUser(): Promise<AuthUser | null> {
   try {
     const store = await cookies();
+
+    // Collect every candidate token and use the first that VERIFIES. One
+    // cookie can hold an expired token while the other was just refreshed —
+    // picking a single cookie blindly logs users out for no reason.
+    const candidates: string[] = [];
+
     // Cognito Amplify v6 stores the ID token under this key pattern.
-    const idToken = store.get(
+    const lastUser = store.get(
       `CognitoIdentityServiceProvider.${cognitoConfig.clientId}.LastAuthUser`
-    )?.value
-      ? store.get(
-          `CognitoIdentityServiceProvider.${cognitoConfig.clientId}.${
-            store.get(`CognitoIdentityServiceProvider.${cognitoConfig.clientId}.LastAuthUser`)!.value
-          }.idToken`
-        )?.value
-      : store.get("gh_id_token")?.value; // fallback: our own cookie set in /auth/callback
-
-    if (!idToken) return null;
-
-    const { payload } = await jwtVerify(idToken, getJWKS(), {
-      issuer: ISSUER,
-      audience: cognitoConfig.clientId,
-    });
-
-    const role = payload["custom:role"] as string | undefined;
-    const clinicId = payload["custom:clinic_id"] as string | undefined;
-
-    if (!role || !clinicId || (role !== "clinician" && role !== "patient")) {
-      return null;
+    )?.value;
+    if (lastUser) {
+      const amplifyToken = store.get(
+        `CognitoIdentityServiceProvider.${cognitoConfig.clientId}.${lastUser}.idToken`
+      )?.value;
+      if (amplifyToken) candidates.push(amplifyToken);
     }
+    // Our own httpOnly cookie set in /auth/callback and /auth/set-cookie.
+    const direct = store.get("gh_id_token")?.value;
+    if (direct && !candidates.includes(direct)) candidates.push(direct);
 
-    return {
-      id: payload.sub!,
-      email: (payload.email as string) ?? "",
-      role: role as "clinician" | "patient",
-      clinicId,
-    };
+    for (const idToken of candidates) {
+      let payload;
+      try {
+        ({ payload } = await jwtVerify(idToken, getJWKS(), {
+          issuer: ISSUER,
+          audience: cognitoConfig.clientId,
+        }));
+      } catch {
+        continue; // expired/invalid — try the next candidate
+      }
+
+      const role = payload["custom:role"] as string | undefined;
+      const clinicId = payload["custom:clinic_id"] as string | undefined;
+
+      if (!role || !clinicId || (role !== "clinician" && role !== "patient")) {
+        continue;
+      }
+
+      return {
+        id: payload.sub!,
+        email: (payload.email as string) ?? "",
+        role: role as "clinician" | "patient",
+        clinicId,
+      };
+    }
+    return null;
   } catch {
     return null;
   }

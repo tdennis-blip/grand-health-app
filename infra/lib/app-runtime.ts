@@ -187,6 +187,11 @@ export class AppRuntime extends Construct {
       NEXT_PUBLIC_COGNITO_USER_POOL_ID: "us-east-1_Yk5gVyw4D",
       NEXT_PUBLIC_COGNITO_CLIENT_ID: "n9pkk4kb0doa5hhspsv510ecq",
       NEXT_PUBLIC_SITE_URL: siteUrl,
+      // Bedrock meal-plan model. The "us." prefix targets the cross-region
+      // inference profile — newer Anthropic models on Bedrock require it for
+      // on-demand invocation (the bare foundation-model ID is rejected).
+      BEDROCK_MODEL_ID: "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+      BEDROCK_REGION: "us-east-1",
     };
 
     const secrets: Record<string, ecs.Secret> = {
@@ -256,6 +261,21 @@ export class AppRuntime extends Construct {
         ],
         resources: [
           `arn:aws:cognito-idp:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:userpool/us-east-1_Yk5gVyw4D`,
+        ],
+      })
+    );
+
+    // Bedrock: AI meal-plan generation runs Claude via Bedrock so PHI stays
+    // under the AWS BAA (no Anthropic-direct key needed in production).
+    // Scoped to Anthropic models + inference profiles in this region.
+    service.taskDefinition.taskRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        actions: ["bedrock:InvokeModel"],
+        resources: [
+          `arn:aws:bedrock:${cdk.Stack.of(this).region}::foundation-model/anthropic.*`,
+          `arn:aws:bedrock:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:inference-profile/us.anthropic.*`,
+          // Cross-region inference profiles route through other US regions.
+          `arn:aws:bedrock:us-*::foundation-model/anthropic.*`,
         ],
       })
     );

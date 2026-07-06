@@ -7,6 +7,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getUser } from "@/lib/auth/server";
 import { withAuth } from "@/lib/db/connection";
+import { recordAudit } from "@/lib/audit";
 import {
   getAdherenceReport,
   type MedAdherenceWindow,
@@ -42,6 +43,14 @@ export async function GET(req: NextRequest) {
   if (!profile) return NextResponse.json({ error: "patient not visible" }, { status: 403 });
 
   const report = await getAdherenceReport(patientId, windowDays, user);
+
+  // HIPAA audit: PHI export to a file leaving the system.
+  recordAudit({
+    action: "export",
+    entityType: "medication_adherence_csv",
+    patientId,
+    meta: { windowDays, medCount: report.perMed.length },
+  }).catch(() => {});
 
   const lines: string[] = [];
   lines.push(row("Section", "patient", "window_days", "from", "to"));

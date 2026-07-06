@@ -17,7 +17,12 @@ import {
 export async function POST(req: NextRequest) {
   const raw = await req.text();
   const signature = req.headers.get("x-whoop-signature") ?? null;
+  // Reject unverified payloads BEFORE touching the database — otherwise
+  // anyone who finds the URL can fill the table with junk (DoS vector).
   const verified = verifySignature(raw, signature);
+  if (!verified) {
+    return NextResponse.json({ ok: false, reason: "signature" }, { status: 401 });
+  }
 
   let payload: any;
   try {
@@ -33,10 +38,6 @@ export async function POST(req: NextRequest) {
             ${JSON.stringify(payload)}, ${signature})
     RETURNING id
   `;
-
-  if (!verified) {
-    return NextResponse.json({ ok: false, reason: "signature" }, { status: 401 });
-  }
 
   try {
     const providerUserId = payload?.user_id;

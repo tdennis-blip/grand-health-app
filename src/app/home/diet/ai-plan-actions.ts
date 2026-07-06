@@ -38,12 +38,24 @@ Rules you must always follow:
 // and runaway token cost.
 const MAX_NOTES_CHARS = 500;
 
+// Patient-facing fallback — never expose env/internal details.
+const UNAVAILABLE_MSG =
+  "The meal-plan assistant isn't available right now. Please try again later or ask your care team.";
+
 export async function generateDietPlan(
   input: GeneratePlanInput
 ): Promise<GeneratePlanResult> {
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key || key === "your-anthropic-api-key-here") {
-    return { ok: false, error: "ANTHROPIC_API_KEY not configured — add your key to .env.local" };
+  // Provider selection:
+  //   BEDROCK_MODEL_ID set  → AWS Bedrock (production path: PHI covered by the
+  //                           AWS BAA; auth via the ECS task role, no API key).
+  //   ANTHROPIC_API_KEY set → Anthropic direct (local dev convenience only —
+  //                           do NOT use with real patient data unless a BAA
+  //                           with Anthropic is in place).
+  const bedrockModelId = process.env.BEDROCK_MODEL_ID;
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!bedrockModelId && (!anthropicKey || anthropicKey === "your-anthropic-api-key-here")) {
+    console.error("generateDietPlan: neither BEDROCK_MODEL_ID nor ANTHROPIC_API_KEY is configured");
+    return { ok: false, error: UNAVAILABLE_MSG };
   }
 
   const user = await requirePatient();
@@ -167,32 +179,69 @@ ${
 Format your response with clear section headers using ##, bullet points for ingredients, and a macros line for each meal.`;
 
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": key,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
+    const text = bedrockModelId
+      ? await callBedrock(bedrockModelId, prompt)
+      : await callAnthropicDirect(anthropicKey!, prompt);
+    if (!text) {
+      console.error("generateDietPlan: empty response from model");
+      return { ok: false, error: UNAVAILABLE_MSG };
+    }
+    return { ok: true, plan: text };
+  } catch (e: any) {
+    // Log internals server-side; patients get the generic message.
+    console.error("generateDietPlan failed:", e?.message ?? e);
+    return { ok: false, error: UNAVAILABLE_MSG };
+  }
+}
+
+const MAX_TOKENS = 1500;
+
+// AWS Bedrock path. Uses the task role's credentials on ECS (or your local
+// `aws configure` profile in dev) — no API key involved. Bedrock accepts the
+// native Anthropic Messages payload with anthropic_version bedrock-2023-05-31.
+async function callBedrock(modelId: string, prompt: string): Promise<string> {
+  const { BedrockRuntimeClient, InvokeModelCommand } = await import(
+    "@aws-sdk/client-bedrock-runtime"
+  );
+  const client = new BedrockRuntimeClient({
+    region: process.env.BEDROCK_REGION ?? process.env.NEXT_PUBLIC_AWS_REGION ?? "us-east-1",
+  });
+  const res = await client.send(
+    new InvokeModelCommand({
+      modelId,
+      contentType: "application/json",
+      accept: "application/json",
       body: JSON.stringify({
-        model: "claude-haiku-4-5",
-        max_tokens: 1500,
+        anthropic_version: "bedrock-2023-05-31",
+        max_tokens: MAX_TOKENS,
         system: SYSTEM_PROMPT,
         messages: [{ role: "user", content: prompt }],
       }),
-    });
+    })
+  );
+  const json = JSON.parse(new TextDecoder().decode(res.body));
+  return json.content?.[0]?.text ?? "";
+}
 
-    if (!res.ok) {
-      const err = await res.text();
-      return { ok: false, error: `Anthropic API error ${res.status}: ${err}` };
-    }
-
-    const json = await res.json();
-    const text: string = json.content?.[0]?.text ?? "";
-    if (!text) return { ok: false, error: "Empty response from AI" };
-
-    return { ok: true, plan: text };
-  } catch (e: any) {
-    return { ok: false, error: e?.message ?? "Unknown error calling AI" };
+// Anthropic-direct path (dev only — see provider selection note above).
+async function callAnthropicDirect(key: string, prompt: string): Promise<string> {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": key,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "claude-haiku-4-5",
+      max_tokens: MAX_TOKENS,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`Anthropic API error ${res.status}: ${(await res.text()).slice(0, 300)}`);
   }
+  const json = await res.json();
+  return json.content?.[0]?.text ?? "";
 }

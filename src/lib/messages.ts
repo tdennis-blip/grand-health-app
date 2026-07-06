@@ -6,6 +6,7 @@
 
 import { getUser } from "@/lib/auth/server";
 import { withAuth } from "@/lib/db/connection";
+import { recordAudit } from "@/lib/audit";
 import type {
   Message,
   ParticipantProfile,
@@ -42,6 +43,13 @@ export async function getThread(patientId: string): Promise<Message[]> {
   const rows = await withAuth(user, (sql) =>
     sql`SELECT id, clinic_id, patient_id, sender_id, sender_role, recipient_id, body, recipient_read_at, created_at FROM messages WHERE patient_id = ${patientId} ORDER BY created_at ASC`
   );
+  // HIPAA read audit: who viewed this message thread. Never blocks the read.
+  recordAudit({
+    action: "read",
+    entityType: "message_thread",
+    patientId,
+    meta: { messageCount: rows.length },
+  }).catch(() => {});
   return rows.map(mapRow);
 }
 

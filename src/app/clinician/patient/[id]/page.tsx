@@ -16,6 +16,7 @@ import { getPatientAppointmentsForClinician, getClinicAppointmentTypes } from "@
 import { RemovePatientButton } from "./remove-patient";
 import { canAccessPatient, isAdminClinician, getCareTeam, getClinicClinicians } from "@/lib/care-team";
 import { CareTeamCard } from "./care-team/care-team-card";
+import { recordAudit } from "@/lib/audit";
 
 export default async function PatientDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -47,6 +48,14 @@ export default async function PatientDetail({ params }: { params: Promise<{ id: 
       </main>
     );
   }
+
+  // HIPAA read audit: clinician opened this patient's chart. Never blocks render.
+  recordAudit({
+    action: "read",
+    entityType: "patient_chart",
+    entityId: id,
+    patientId: id,
+  }).catch(() => {});
 
   const [isAdmin, careTeam, clinicClinicians] = await Promise.all([
     isAdminClinician(user.id),

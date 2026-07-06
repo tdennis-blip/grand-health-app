@@ -16,7 +16,9 @@ export async function POST(req: NextRequest) {
   if (!expected) {
     return NextResponse.json({ error: "cron token not configured" }, { status: 500 });
   }
-  const got = req.headers.get("x-cron-token") ?? req.nextUrl.searchParams.get("token");
+  // Header only — never accept the token in the query string (URLs are
+  // logged by ALBs/proxies, which would leak the secret).
+  const got = req.headers.get("x-cron-token");
   if (got !== expected) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }

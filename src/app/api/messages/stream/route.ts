@@ -4,10 +4,18 @@
 //
 // Usage: EventSource("/api/messages/stream?patientId=<uuid>&after=<iso>")
 // Events: { type: "message", data: Message } | { type: "update", data: Message }
+//
+// Access control (two layers):
+//   1. App check: patients may only stream their own thread; clinicians must
+//      be an admin or on the patient's care team (canAccessPatient).
+//   2. DB check: every poll runs through withAuth so the RLS session vars are
+//      set and the care-team restrictive policies apply. Even if the app
+//      check regressed, RLS returns zero rows for an unauthorized user.
 
 import { NextRequest } from "next/server";
 import { getUser } from "@/lib/auth/server";
-import { sql } from "@/lib/db/connection";
+import { withAuth } from "@/lib/db/connection";
+import { canAccessPatient } from "@/lib/care-team";
 import type { Message } from "@/lib/messages-shared";
 
 export const runtime = "nodejs";
@@ -38,9 +46,10 @@ export async function GET(request: NextRequest) {
   if (!patientId) return new Response("Missing patientId", { status: 400 });
 
   // Verify the requesting user is allowed to see this thread.
+  // Patients: own thread only. Clinicians: admin or care-team member.
   const allowed =
     (user.role === "patient" && user.id === patientId) ||
-    (user.role === "clinician" && user.clinicId);
+    (user.role === "clinician" && (await canAccessPatient(user, patientId)));
 
   if (!allowed) return new Response("Forbidden", { status: 403 });
 
@@ -56,16 +65,20 @@ export async function GET(request: NextRequest) {
       const poll = async () => {
         if (closed) return;
         try {
-          const rows = await sql<Record<string, unknown>[]>`
-            SELECT * FROM messages
-            WHERE patient_id = ${patientId}
-              AND (
-                created_at > ${after}::timestamptz
-                OR (recipient_read_at IS NOT NULL AND created_at >= ${after}::timestamptz)
-              )
-            ORDER BY created_at ASC
-            LIMIT 50
-          `;
+          // withAuth sets the RLS session variables inside a transaction, so
+          // the messages policies (patient self / care-team clinician) apply.
+          const rows = await withAuth(user, (sql) =>
+            sql<Record<string, unknown>[]>`
+              SELECT * FROM messages
+              WHERE patient_id = ${patientId}
+                AND (
+                  created_at > ${after}::timestamptz
+                  OR (recipient_read_at IS NOT NULL AND created_at >= ${after}::timestamptz)
+                )
+              ORDER BY created_at ASC
+              LIMIT 50
+            `
+          );
 
           for (const row of rows) {
             const msg = mapRow(row);

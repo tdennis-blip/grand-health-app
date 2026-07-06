@@ -30,21 +30,31 @@ async function verifyIdToken(token: string): Promise<TokenPayload | null> {
   }
 }
 
-function getIdTokenFromRequest(request: NextRequest): string | null {
+function getIdTokenCandidates(request: NextRequest): string[] {
+  // All candidate tokens, in preference order. The caller verifies each and
+  // uses the first VALID one — important because our gh_id_token cookie can
+  // hold an expired token while Amplify's client-side cookie has a freshly
+  // refreshed one. Previously we returned only the first cookie found, so an
+  // expired gh_id_token bounced users to /login every hour even though a
+  // valid refreshed token was sitting right there.
+  const candidates: string[] = [];
+
   // Primary: our own httpOnly cookie set in /auth/callback
   const direct = request.cookies.get("gh_id_token")?.value;
-  if (direct) return direct;
+  if (direct) candidates.push(direct);
 
   // Fallback: Amplify's client-side cookie (set when using ssr:true)
   const lastUser = request.cookies.get(
     `CognitoIdentityServiceProvider.${cognitoConfig.clientId}.LastAuthUser`
   )?.value;
-  if (!lastUser) return null;
-  return (
-    request.cookies.get(
+  if (lastUser) {
+    const amplifyToken = request.cookies.get(
       `CognitoIdentityServiceProvider.${cognitoConfig.clientId}.${lastUser}.idToken`
-    )?.value ?? null
-  );
+    )?.value;
+    if (amplifyToken && amplifyToken !== direct) candidates.push(amplifyToken);
+  }
+
+  return candidates;
 }
 
 export async function updateSession(request: NextRequest) {
@@ -57,9 +67,9 @@ export async function updateSession(request: NextRequest) {
   const isLegalPage = pathname === "/privacy" || pathname === "/terms";
   const isPublic = pathname === "/" || isAuthPage || isLegalPage;
 
-  const idToken = getIdTokenFromRequest(request);
+  const candidates = getIdTokenCandidates(request);
 
-  if (!idToken) {
+  if (candidates.length === 0) {
     if (!isPublic) {
       const url = request.nextUrl.clone();
       url.pathname = "/login";
@@ -69,10 +79,15 @@ export async function updateSession(request: NextRequest) {
     return response;
   }
 
-  const payload = await verifyIdToken(idToken);
+  // Use the first candidate that verifies (see getIdTokenCandidates).
+  let payload: TokenPayload | null = null;
+  for (const token of candidates) {
+    payload = await verifyIdToken(token);
+    if (payload) break;
+  }
 
   if (!payload) {
-    // Token invalid/expired — clear cookie and redirect to login
+    // All tokens invalid/expired — clear cookie and redirect to login
     if (!isPublic) {
       const url = request.nextUrl.clone();
       url.pathname = "/login";

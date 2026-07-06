@@ -64,7 +64,16 @@ export async function confirmNewPassword(newPassword: string) {
 }
 
 export async function signOut() {
-  await amplifySignOut();
+  // global: true revokes the refresh token and invalidates tokens on ALL
+  // devices via Cognito GlobalSignOut — without it, a stolen token stays
+  // usable until natural expiry even after the user "signs out".
+  try {
+    await amplifySignOut({ global: true });
+  } catch {
+    // GlobalSignOut needs a valid access token; if it's already expired,
+    // fall back to local sign-out so the user isn't stuck.
+    await amplifySignOut();
+  }
 }
 
 // Step 1 of password recovery: Cognito emails a verification code to the
