@@ -61,6 +61,9 @@ export default async function ClinicianLayout({
             <Link href="/clinician/settings/appointment-types" className="text-slate-700 hover:text-slate-900 font-medium">
               Settings
             </Link>
+            <Link href="/clinician/settings/team" className="text-slate-700 hover:text-slate-900 font-medium">
+              Team
+            </Link>
             <Link href="/clinician/messages" className="text-slate-700 hover:text-slate-900 font-medium flex items-center gap-1.5">
               Messages
               {unread > 0 && (
