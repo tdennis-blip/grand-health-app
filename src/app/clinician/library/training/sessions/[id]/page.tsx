@@ -30,7 +30,10 @@ export default async function SessionEditPage({ params }: { params: Promise<{ id
         sql`SELECT se.id, se.sort_order, se.exercise_id, e.id AS ex_id, e.name AS ex_name, e.primary_area, e.video_title FROM session_exercises se JOIN exercise_library e ON e.id = se.exercise_id WHERE se.session_id = ${id} ORDER BY se.sort_order ASC`
       ),
       withAuth(user, (sql) =>
-        sql`SELECT id, name, primary_area FROM exercise_library WHERE kind = ${kind} ORDER BY name ASC`
+        // Strength and mobility sessions can both pull from either library, so a
+        // strength session can include a mobility move (and vice versa). Sort the
+        // session's own kind first, then by name.
+        sql`SELECT id, name, primary_area, kind FROM exercise_library WHERE kind IN ('strength', 'mobility') ORDER BY (kind = ${kind}) DESC, name ASC`
       ),
       withAuth(user, (sql) =>
         sql`SELECT ss.id, ss.session_exercise_id, ss.set_number, ss.reps, ss.weight, ss.duration_seconds FROM session_sets ss JOIN session_exercises se ON se.id = ss.session_exercise_id WHERE se.session_id = ${id} ORDER BY ss.set_number ASC`
@@ -47,7 +50,7 @@ export default async function SessionEditPage({ params }: { params: Promise<{ id
       videoTitle: se.video_title ?? null,
       sets: (setsByEx[se.id] ?? []).map((s: any) => ({ id: s.id, setNumber: s.set_number, reps: s.reps, weight: s.weight, durationSeconds: s.duration_seconds ?? null })),
     }));
-    exerciseLibrary = libRows.map((e: any) => ({ id: e.id, name: e.name, primaryArea: e.primary_area }));
+    exerciseLibrary = libRows.map((e: any) => ({ id: e.id, name: e.name, primaryArea: e.primary_area, kind: e.kind }));
   }
 
   return (

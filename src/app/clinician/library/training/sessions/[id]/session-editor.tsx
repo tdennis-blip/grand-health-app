@@ -35,7 +35,7 @@ type Attached = {
   sets: AttachedSet[];
 };
 
-type LibExercise = { id: string; name: string; primaryArea: string | null };
+type LibExercise = { id: string; name: string; primaryArea: string | null; kind: "strength" | "mobility" };
 
 type Header = {
   kind: Kind;
@@ -326,7 +326,7 @@ function ExercisesSection({
         <div>
           <div className="text-[11px] uppercase tracking-wide text-slate-500 font-semibold">{labels.title}</div>
           <div className="text-[11px] text-slate-500">
-            Picks from your {kind} exercise library. Add → reorder → edit sets.
+            Picks from your strength and mobility exercise libraries. Add → reorder → edit sets.
           </div>
         </div>
         <button
@@ -349,7 +349,7 @@ function ExercisesSection({
 
       {noneInLibrary && (
         <div className="text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">
-          No {kind} exercises in your library yet. Add some on the Exercises page first.
+          No strength or mobility exercises in your library yet. Add some on the Exercises page first.
         </div>
       )}
 
@@ -410,7 +410,9 @@ function AttachedExerciseRow({
           className="flex-1 text-sm font-semibold text-slate-900 border border-slate-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:border-teal-500"
         >
           {exerciseLibrary.map((ex) => (
-            <option key={ex.id} value={ex.id}>{ex.name}</option>
+            <option key={ex.id} value={ex.id}>
+              {ex.name}{ex.kind !== kind ? ` · ${ex.kind}` : ""}
+            </option>
           ))}
           {!exerciseLibrary.find((e) => e.id === attached.exerciseId) && (
             <option value={attached.exerciseId}>(unavailable)</option>
