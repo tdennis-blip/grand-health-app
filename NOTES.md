@@ -21,6 +21,69 @@ Full ordered runbook: `docs/deploy-staging-runbook.md`.
 
 ---
 
+## 📋 Session log 2026-07-13 — clinician MFA, AWS account hardening, budget, training-session tweaks
+
+Big security + ops day. All shipped to staging (deployed).
+
+**⭐ Clinician MFA (TOTP) — enforced before any PHI.** Patients + clinicians share one Cognito pool (`us-east-1_Yk5gVyw4D`), and pool MFA is all-or-nothing, so "clinicians only" is done app-side:
+- **Pool set to `OPTIONAL` + software-token TOTP** via `aws cognito-idp set-user-pool-mfa-config --user-pool-id us-east-1_Yk5gVyw4D --software-token-mfa-configuration Enabled=true --mfa-configuration OPTIONAL`. OPTIONAL = Cognito never forces patients; the app forces clinicians.
+- **Login** (`src/app/login/page.tsx` + `src/lib/auth/client.ts`): handles `CONFIRM_SIGN_IN_WITH_TOTP_CODE` (returning clinician enters 6-digit code). New client helpers `confirmTotpCode`, `startTotpEnrollment`, `confirmTotpEnrollment` (setUpTOTP → verifyTOTPSetup → updateMFAPreference totp PREFERRED).
+- **Enrollment page `/mfa-setup`** (deliberately OUTSIDE `/clinician/*` to avoid a redirect loop with the gate). Shows the setup key for manual entry + an `otpauth://` link (no QR lib on purpose — didn't want to add a dep that breaks CI `npm ci`, and won't send the secret to an external QR image service). `src/app/mfa-setup/{page.tsx,mfa-setup-client.tsx}`.
+- **Gate**: `src/app/clinician/layout.tsx` calls new `userHasTotpMfa(email)` in `src/lib/cognito-admin.ts` (AdminGetUser → checks `UserMFASettingList` includes `SOFTWARE_TOKEN_MFA`, fails CLOSED) and redirects clinicians without MFA to `/mfa-setup`. Task role already had `cognito-idp:AdminGetUser`, so no CDK change.
+- **Lost-device recovery** (admin resets a clinician so they can re-enroll): `aws cognito-idp admin-set-user-mfa-preference --user-pool-id us-east-1_Yk5gVyw4D --username EMAIL --software-token-mfa-settings Enabled=false,PreferredMfa=false`.
+- ⚠️ Gate calls AdminGetUser on every clinician page load — fine at single-clinic scale; could cache the "enrolled" result later. Closes the HIPAA "clinician MFA" open item.
+
+**⭐ AWS account hardened (see the [AWS account hardening] memory for the full posture).** Account `669960694177`, opened 2026-06-03 (so 12-mo free tier covers RDS micro + 20GB). Key changes:
+- **Root access key DELETED** — the CLI had been authenticating as *root via an access key* (bypasses MFA — the worst credential). Root now has MFA + zero programmatic access.
+- **Daily identity = IAM user `Tobin`** (AdministratorAccess). Local CLI now uses Tobin's key; Tobin has console login + MFA. Old June-10 Tobin key deactivated.
+- **GuardDuty** enabled (detector `32cfae90b2ce4ef550f4b655401e87b1`). **CloudTrail** multi-region trail `management-events` (home region us-east-2) with log-file validation on.
+- **RDS** now: deletion protection ON, 7-day backups, `publiclyAccessible:false` — set live via CLI AND codified in CDK `infra/lib/grand-health-stack.ts` (commit 8ca522c). ⚠️ CDK change is committed but NOT yet `cdk deploy`-ed (live settings already active via CLI; `cdk diff` flagged the DB "may be replaced" from the backup-retention change — it's conservative/no-interruption, but re-check the change set on the next infra deploy; deletion protection now also protects against a bad deploy). CI does NOT run cdk deploy — infra changes need a manual `cdk deploy` with the full `-c withService=true -c domain=... -c hostedZone=...` context.
+- **Budget** `grand-health-monthly` = $200/mo cost budget, email alerts to tdennis@ at 50/80/100% actual + 100% forecast. Cost Explorer was enabled (takes ~24h to populate the CE API). Monthly floor ~$80-100 (NAT ~$33, ALB ~$20, Fargate 0.5vCPU/1GB ~$18, RDS). Cost Explorer API needs the account to have been enabled first — it now is.
+
+**Training-session tweaks (commits 63dcab0, ac6fb5c):**
+- **Exercises now revalidate the session + program routes** (`src/app/clinician/library/training/exercises/actions.ts` `revalidateAll` now hits exercises + sessions + programs) — fixes "new exercises don't show up in the session picker without a hard refresh."
+- **Strength + mobility sessions can pull from BOTH exercise libraries** now (`sessions/[id]/page.tsx` query `kind IN ('strength','mobility')`, session's own kind sorted first; `session-editor.tsx` tags off-kind options like `Name · mobility`). No DB/kind guard existed on the attach action, so no migration needed.
+
+**⏳ Open on Tobin's side (not code):** assign MFA to the `Tobin` IAM *console* login if not done; rotate the GitHub token in "Git Hub Work computer token.docx"; optionally `cdk deploy` to formalize the RDS settings (low urgency — already live); consider trimming NAT (~$33) + oversized 100GB RDS storage for staging. Repo still in iCloud (recurring `index.lock` + stale-nested-copy friction all day) — move to `~/dev`.
+
+---
+
+## 📋 Session log 2026-07-07 — staff login deactivation (soft-delete for the Team page)
+
+**Problem:** the clinician **Team** page (`/clinician/settings/team`, reached via your name → settings) listed stale/old staff logins with no way to remove them. Hard-deleting a `clinician_profiles` row is unsafe — it's referenced by `audit_log`, `patient_care_team`, and `messages`, and destroys HIPAA-relevant history. **Decision: reversible soft-delete (deactivate/reactivate), not hard delete.**
+
+**⭐ Migration `0035_clinician_deactivation.sql` (APPLIED to staging 2026-07-07 via bastion tunnel).** Adds nullable `clinician_profiles.deactivated_at`. Also updates the two SECURITY DEFINER RLS helpers from 0032 so a deactivated login loses access at the **database** layer, not just the UI: `current_user_is_admin()` now requires `deactivated_at is null`, and `clinician_can_access_patient()` returns false for any deactivated clinician. Idempotent.
+
+**Data layer (`lib/care-team.ts`):** `StaffMember` gains `isActive`; `getClinicStaff` selects `deactivated_at` and sorts deactivated rows to the bottom; `isAdminClinician` and `canAccessPatient` ignore deactivated accounts; new `setClinicianActive(actor, target, active)` with guards mirroring `setClinicianAdmin` — actor must be an admin in the same clinic, can't deactivate yourself, can't deactivate the last active admin.
+
+**Action + UI:** `settings/team/actions.ts` → `setStaffActive` server action, audited as `clinician_deactivation`. `team-manager.tsx` → red **Deactivate** button on every row except your own (with a confirm), **Reactivate** on deactivated rows, a "Deactivated" badge + dimmed row, and a **"Hide deactivated (N)"** toggle (default on) so the roster stays clean.
+
+**🐛 Deploy gotcha (cost a cycle):** the first push (`6143728`) committed a **stale copy** of `team-manager.tsx` — iCloud sync lag meant `git add -A` snapshotted the pre-edit file (admin buttons present, deactivate code missing) even though the edits were on disk. Symptom: staging ran the correct commit SHA but the Deactivate buttons never appeared. Fix: re-`git add -A && commit && push` (`84df16f`) once iCloud settled, then re-run the deploy workflow. **Verify tip:** `aws ecs describe-task-definition --task-definition <current> --query "taskDefinition.containerDefinitions[0].image"` — the image tag ends in the git SHA, so confirm it matches the intended commit. (Yet another reason to move the repo out of iCloud.)
+
+**Ops:** bastion instance is now **`i-095fa0c1ee773c850`** (`GrandHealthStack/Bastion`) — the old `i-075685ed25f5a9f0c` was replaced (TargetNotConnected). Re-discover after any infra deploy with `aws ec2 describe-instances --filters "Name=instance-state-name,Values=running" --query "Reservations[].Instances[].[InstanceId,Tags[?Key=='Name'].Value|[0]]" --output text`. For DDL/migrations, `DIRECT_DATABASE_URL` must use the **owner** role — pull `SERVICE_ROLE_DATABASE_URL` (not `DATABASE_URL`, which is now the non-owner `grandhealth_app`) from the secret and rewrite host to localhost.
+
+**⏳ OPEN:** deactivation is reversible only via the UI (or `update clinician_profiles set deactivated_at = null`); no Cognito-side disable yet (a deactivated clinician still exists in Cognito, just loses all app/PHI access). Consider also blocking their login at the auth layer if fully offboarding.
+
+---
+
+## 📋 Session log 2026-07-06 — HIPAA/security review fixes, AWS Bedrock meal planner, BAA
+
+Big compliance + hardening session (commits `c69753b`, `6143728`).
+
+**Security review fixes (shipped):** closed an RLS-bypass in the message stream route; added PHI-read audit logging; loading/error boundaries for clinician + patient shells; cron tokens now header-only; webhooks verify-signature-first; security headers in `next.config.mjs`; global sign-out; auth token-candidate fallback. **Migration `0034_audit_log_immutable.sql`** makes `audit_log` append-only (no update/delete) — **APPLIED to staging 2026-07-06** via the bastion tunnel.
+
+**⭐ AI meal planner moved to AWS Bedrock.** The Anthropic-direct BAA path was rejected (sales won't engage at single-clinic volume, per Anthropic support). Switched to **AWS Bedrock** (covered under the AWS BAA): `home/diet/ai-plan-actions.ts` now prefers `BEDROCK_MODEL_ID` with task-role auth, keeping `ANTHROPIC_API_KEY` as a dev-only fallback. New dep `@aws-sdk/client-bedrock-runtime`; `infra/lib/app-runtime.ts` grants the task role `bedrock:InvokeModel`.
+
+**✅ AWS BAA accepted** in AWS Artifact 2026-07-06.
+
+**⏳ Bedrock go-live checklist (Tobin's side):** enable **Claude Haiku 4.5** model access in Bedrock (us-east-1); set `BEDROCK_MODEL_ID` in the `grand-health/staging/app-env` secret (read-modify-write with jq → `put-secret-value`, do NOT touch `secretObjectValue`); `npm install` (the new AWS SDK dep wasn't installed in-session); `cdk deploy -c stage=staging -c withService=true -c domain=staging.mygrandhealth.com -c hostedZone=staging.mygrandhealth.com` for the new IAM statement; redeploy.
+
+**⏳ Still open on Tobin's side (not code):** Cognito MFA for clinicians; verify RDS encryption/backups/Multi-AZ/deletion-protection; rotate the GitHub token in "Git Hub Work computer token.docx"; confirm `DATABASE_URL` points at `grandhealth_app` (non-owner). Cloudinary: decided no BAA needed (exercise-library videos only, no PHI — revisit if patient media is ever uploaded).
+
+**⏳ Open code follow-ups:** CI with tests (automate `rls-care-team-test.sql`); roster pagination; CSP; rate limiting; idle timeout; renumber the duplicate migration numbers; delete the stale nested clone `grand-health-app/grand-health-app`.
+
+---
+
 ## 📋 Session log 2026-06-29 — diet activity v2, password reset, delete + save bug fixes
 
 All shipped via `git push` + manual deploy workflow (still no auto-deploy). Verified bastion instance still `i-075685ed25f5a9f0c`.
