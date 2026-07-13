@@ -71,8 +71,9 @@ export class GrandHealthStack extends cdk.Stack {
       databaseName: "grandhealth",
       multiAz: isProd,
       storageEncrypted: true,         // HIPAA: encryption at rest
-      deletionProtection: isProd,
-      backupRetention: cdk.Duration.days(isProd ? 14 : 3),
+      publiclyAccessible: false,      // never expose the DB with a public IP
+      deletionProtection: true,       // guard against accidental (or bad-deploy) deletion in every env
+      backupRetention: cdk.Duration.days(isProd ? 14 : 7),
       // Enable enhanced monitoring for HIPAA audit trail
       monitoringInterval: cdk.Duration.seconds(60),
       enablePerformanceInsights: true,
