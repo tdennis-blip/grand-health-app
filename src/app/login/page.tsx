@@ -5,6 +5,7 @@ import {
   configureAmplify,
   signInWithPassword,
   confirmNewPassword,
+  confirmTotpCode,
   getIdToken,
   requestPasswordReset,
   confirmPasswordReset,
@@ -22,6 +23,10 @@ export default function LoginPage() {
   const [needNewPassword, setNeedNewPassword] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+
+  // MFA (TOTP) code challenge for enrolled clinicians.
+  const [needTotp, setNeedTotp] = useState(false);
+  const [totpCode, setTotpCode] = useState("");
 
   // Password recovery flow: 'request' (email a code) → 'confirm' (code + new pw).
   const [view, setView] = useState<"signin" | "forgotRequest" | "forgotConfirm">("signin");
@@ -122,11 +127,50 @@ export default function LoginPage() {
         setStatus("idle");
         return;
       }
+      if (result.nextStep?.signInStep === "CONFIRM_SIGN_IN_WITH_TOTP_CODE") {
+        setNeedTotp(true);
+        setStatus("idle");
+        return;
+      }
+      // A clinician who hasn't enrolled yet signs in normally (pool MFA is
+      // OPTIONAL); the clinician area then redirects them to /mfa-setup. So we
+      // don't expect a TOTP *setup* challenge here — but guard just in case.
+      if (result.nextStep?.signInStep === "CONTINUE_SIGN_IN_WITH_TOTP_SETUP") {
+        setStatus("error");
+        setErrorMsg("Your account needs multi-factor setup. Sign in again and follow the setup prompt, or contact your administrator.");
+        return;
+      }
       setStatus("error");
       setErrorMsg("Sign-in incomplete — please try again.");
     } catch (err: unknown) {
       setStatus("error");
       setErrorMsg(err instanceof Error ? err.message : "Sign-in failed.");
+    }
+  };
+
+  const handleTotpCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setStatus("sending");
+    setErrorMsg(null);
+    try {
+      const result = await confirmTotpCode(totpCode);
+      if (result.isSignedIn) {
+        if (!(await finish())) {
+          setStatus("error");
+          setErrorMsg("Verified but couldn't establish a session. Please try again.");
+        }
+        return;
+      }
+      setStatus("error");
+      setErrorMsg("Couldn't verify that code — please try again.");
+    } catch (err: unknown) {
+      setStatus("error");
+      const name = err instanceof Error ? err.name : "";
+      if (name === "CodeMismatchException" || name === "EnableSoftwareTokenMFAException") {
+        setErrorMsg("That code is incorrect or expired. Enter the current 6-digit code from your authenticator app.");
+      } else {
+        setErrorMsg(err instanceof Error ? err.message : "Couldn't verify code.");
+      }
     }
   };
 
@@ -171,7 +215,9 @@ export default function LoginPage() {
           <div>
             <div className="font-semibold tracking-tight">Grand Health</div>
             <div className="text-[11px] text-slate-500 -mt-0.5">
-              {needNewPassword
+              {needTotp
+                ? "Enter your authenticator code"
+                : needNewPassword
                 ? "Set your password"
                 : view === "forgotRequest"
                 ? "Reset your password"
@@ -186,7 +232,36 @@ export default function LoginPage() {
           <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-2">{info}</div>
         )}
 
-        {view === "forgotRequest" ? (
+        {needTotp ? (
+          <form onSubmit={handleTotpCode} className="space-y-3">
+            <p className="text-[12px] text-slate-600 leading-snug">
+              Open your authenticator app and enter the current 6-digit code for Grand Health.
+            </p>
+            <label className="block">
+              <span className="text-[11px] uppercase tracking-wide text-slate-500 font-medium">Authenticator code</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                required
+                value={totpCode}
+                onChange={(e) => setTotpCode(e.target.value)}
+                placeholder="123456"
+                className="mt-1 w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-teal-500 tracking-widest"
+              />
+            </label>
+            {errorMsg && (
+              <div className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg p-2">{errorMsg}</div>
+            )}
+            <button
+              type="submit"
+              disabled={status === "sending"}
+              className="w-full bg-teal-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-teal-800 disabled:opacity-60"
+            >
+              {status === "sending" ? "Verifying…" : "Verify & sign in"}
+            </button>
+          </form>
+        ) : view === "forgotRequest" ? (
           <form onSubmit={handleForgotRequest} className="space-y-3">
             <p className="text-[12px] text-slate-600 leading-snug">
               Enter your account email and we&apos;ll send a verification code to reset your password.

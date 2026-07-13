@@ -6,6 +6,7 @@ import {
   CognitoIdentityProviderClient,
   AdminCreateUserCommand,
   AdminDeleteUserCommand,
+  AdminGetUserCommand,
   UsernameExistsException,
   UserNotFoundException,
 } from "@aws-sdk/client-cognito-identity-provider";
@@ -56,6 +57,23 @@ export async function createCognitoUser(opts: {
   } catch (err) {
     if (err instanceof UsernameExistsException) throw new EmailInUseError();
     throw err;
+  }
+}
+
+// True if the user has TOTP (software-token) MFA active on their Cognito
+// account. Used to gate clinicians into MFA enrollment before they see PHI.
+// Fails CLOSED on error (returns false) so a transient Cognito error forces
+// re-enrollment rather than silently letting someone in without MFA.
+export async function userHasTotpMfa(username: string): Promise<boolean> {
+  try {
+    const res = await getClient().send(
+      new AdminGetUserCommand({ UserPoolId: USER_POOL_ID, Username: username })
+    );
+    return (res.UserMFASettingList ?? []).includes("SOFTWARE_TOKEN_MFA");
+  } catch (err) {
+    if (err instanceof UserNotFoundException) return false;
+    // Unknown error → treat as "no MFA" so we don't accidentally bypass the gate.
+    return false;
   }
 }
 

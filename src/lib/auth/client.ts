@@ -9,6 +9,9 @@ import {
   updatePassword as amplifyUpdatePassword,
   updateUserAttributes as amplifyUpdateUserAttributes,
   confirmUserAttribute as amplifyConfirmUserAttribute,
+  setUpTOTP as amplifySetUpTOTP,
+  verifyTOTPSetup as amplifyVerifyTOTPSetup,
+  updateMFAPreference as amplifyUpdateMFAPreference,
   fetchAuthSession,
   type SignInInput,
 } from "aws-amplify/auth";
@@ -61,6 +64,30 @@ export async function getIdToken(): Promise<string | null> {
 // Completes the first-login "new password required" challenge.
 export async function confirmNewPassword(newPassword: string) {
   return amplifyConfirmSignIn({ challengeResponse: newPassword });
+}
+
+// Completes a TOTP MFA challenge at sign-in (returning clinician who already
+// enrolled). Submits the 6-digit code from their authenticator app.
+export async function confirmTotpCode(code: string) {
+  return amplifyConfirmSignIn({ challengeResponse: code.trim() });
+}
+
+// --- In-app TOTP enrollment (clinician MFA setup) ---------------------------
+
+// Begins enrollment: returns the otpauth:// URI (for a QR code) plus the raw
+// shared secret (for manual entry) so the setup screen can show both.
+export async function startTotpEnrollment(accountName: string) {
+  const out = await amplifySetUpTOTP();
+  const uri = out.getSetupUri("Grand Health", accountName).toString();
+  return { uri, secret: out.sharedSecret };
+}
+
+// Finishes enrollment: verifies the first code from the authenticator, then
+// makes TOTP this user's preferred (required) second factor so Cognito will
+// challenge them for it on every future sign-in.
+export async function confirmTotpEnrollment(code: string) {
+  await amplifyVerifyTOTPSetup({ code: code.trim() });
+  await amplifyUpdateMFAPreference({ totp: "PREFERRED" });
 }
 
 export async function signOut() {

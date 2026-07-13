@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { requireClinician } from "@/lib/auth/server";
+import { userHasTotpMfa } from "@/lib/cognito-admin";
 import { withAuth } from "@/lib/db/connection";
 import { getMyUnreadCount } from "@/lib/messages";
 import { SignOutButton } from "@/components/sign-out-button";
@@ -10,6 +12,12 @@ export default async function ClinicianLayout({
   children: React.ReactNode;
 }) {
   const user = await requireClinician();
+
+  // MFA gate: clinicians must have TOTP enrolled before they can reach any PHI.
+  // /mfa-setup lives outside this layout, so redirecting there won't loop.
+  if (!(await userHasTotpMfa(user.email))) {
+    redirect("/mfa-setup");
+  }
 
   const [profile] = await withAuth(user, (sql) =>
     sql`
