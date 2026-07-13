@@ -21,7 +21,14 @@ const exerciseSchema = z.object({
   perSide: z.boolean().default(false),
 });
 
-const revalidateAll = () => revalidatePath("/clinician/library/training/exercises");
+const revalidateAll = () => {
+  // Exercises feed the session editor (exercise picker) and, through sessions,
+  // the program editor. Revalidate all three so a newly added/edited/deleted
+  // exercise shows up there without needing a hard refresh.
+  revalidatePath("/clinician/library/training/exercises");
+  revalidatePath("/clinician/library/training/sessions", "layout");
+  revalidatePath("/clinician/library/training/programs", "layout");
+};
 
 export async function createExercise(input: z.infer<typeof exerciseSchema>) {
   const parsed = exerciseSchema.parse(input);
