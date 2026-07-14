@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { requireClinician } from "@/lib/auth/server";
-import { userHasTotpMfa } from "@/lib/cognito-admin";
+import { isAdminClinician } from "@/lib/care-team";
 import { withAuth } from "@/lib/db/connection";
 import { getMyUnreadCount } from "@/lib/messages";
 import { SignOutButton } from "@/components/sign-out-button";
@@ -11,13 +10,9 @@ export default async function ClinicianLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // requireClinician() enforces the TOTP MFA gate itself now (redirects
+  // un-enrolled clinicians to /mfa-setup), so no separate check here.
   const user = await requireClinician();
-
-  // MFA gate: clinicians must have TOTP enrolled before they can reach any PHI.
-  // /mfa-setup lives outside this layout, so redirecting there won't loop.
-  if (!(await userHasTotpMfa(user.email))) {
-    redirect("/mfa-setup");
-  }
 
   const [profile] = await withAuth(user, (sql) =>
     sql`
@@ -31,7 +26,10 @@ export default async function ClinicianLayout({
 
   const roleLabel = profile?.role_label ?? null;
 
-  const unread = await getMyUnreadCount();
+  const [unread, isAdmin] = await Promise.all([
+    getMyUnreadCount(),
+    isAdminClinician(user.id),
+  ]);
 
   return (
     <div className="min-h-screen bg-slate-100">
@@ -63,9 +61,11 @@ export default async function ClinicianLayout({
             <Link href="/clinician/refills" className="text-slate-700 hover:text-slate-900 font-medium">
               Refills
             </Link>
-            <Link href="/clinician/audit" className="text-slate-700 hover:text-slate-900 font-medium">
-              Audit log
-            </Link>
+            {isAdmin && (
+              <Link href="/clinician/audit" className="text-slate-700 hover:text-slate-900 font-medium">
+                Audit log
+              </Link>
+            )}
             <Link href="/clinician/settings/appointment-types" className="text-slate-700 hover:text-slate-900 font-medium">
               Settings
             </Link>

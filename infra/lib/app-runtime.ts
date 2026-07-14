@@ -258,6 +258,9 @@ export class AppRuntime extends Construct {
           "cognito-idp:AdminSetUserPassword",
           "cognito-idp:AdminUpdateUserAttributes",
           "cognito-idp:AdminDeleteUser",
+          // Deactivation flows disable/re-enable the login (2026-07-14 review).
+          "cognito-idp:AdminDisableUser",
+          "cognito-idp:AdminEnableUser",
         ],
         resources: [
           `arn:aws:cognito-idp:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:userpool/us-east-1_Yk5gVyw4D`,

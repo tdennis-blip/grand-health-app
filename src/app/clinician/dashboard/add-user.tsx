@@ -4,7 +4,9 @@ import { useState, useTransition } from "react";
 import { UserPlus, X } from "lucide-react";
 import { createUserAccount } from "./actions";
 
-export function AddUserButton() {
+// canCreateStaff: only admins may mint clinician/staff logins (the server
+// action enforces this too — the prop just hides the toggle).
+export function AddUserButton({ canCreateStaff = false }: { canCreateStaff?: boolean }) {
   const [open, setOpen] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -52,7 +54,7 @@ export function AddUserButton() {
       </div>
 
       <div className="flex gap-1.5">
-        {(["patient", "clinician"] as const).map((r) => (
+        {(canCreateStaff ? (["patient", "clinician"] as const) : (["patient"] as const)).map((r) => (
           <button
             key={r}
             type="button"

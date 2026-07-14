@@ -6,6 +6,8 @@ import {
   CognitoIdentityProviderClient,
   AdminCreateUserCommand,
   AdminDeleteUserCommand,
+  AdminDisableUserCommand,
+  AdminEnableUserCommand,
   AdminGetUserCommand,
   UsernameExistsException,
   UserNotFoundException,
@@ -74,6 +76,24 @@ export async function userHasTotpMfa(username: string): Promise<boolean> {
     if (err instanceof UserNotFoundException) return false;
     // Unknown error → treat as "no MFA" so we don't accidentally bypass the gate.
     return false;
+  }
+}
+
+// Disable or re-enable a Cognito login. Used when deactivating/reactivating
+// staff and patients so the soft-deleted account can't authenticate at all
+// (before this, a deactivated user could still sign in and was only fenced
+// by the app/RLS layers). No-op if the user doesn't exist.
+// Requires cognito-idp:AdminDisableUser / AdminEnableUser on the task role.
+export async function setCognitoUserEnabled(email: string, enabled: boolean): Promise<void> {
+  try {
+    await getClient().send(
+      enabled
+        ? new AdminEnableUserCommand({ UserPoolId: USER_POOL_ID, Username: email })
+        : new AdminDisableUserCommand({ UserPoolId: USER_POOL_ID, Username: email })
+    );
+  } catch (err) {
+    if (err instanceof UserNotFoundException) return;
+    throw err;
   }
 }
 

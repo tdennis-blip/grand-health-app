@@ -63,9 +63,13 @@ export async function removeCareTeamMember(input: z.infer<typeof schema>) {
     throw new Error("You can only remove yourself from a care team.");
   }
 
+  // Clinic guard (2026-07-14 review): without it, an admin could remove
+  // care-team rows for patients outside their clinic. Single-clinic today,
+  // but keep the invariant honest.
   await serviceRoleSql`
     DELETE FROM public.patient_care_team
     WHERE patient_id = ${patientId} AND clinician_id = ${clinicianId}
+      AND clinic_id = ${user.clinicId}
   `;
 
   await recordAudit({

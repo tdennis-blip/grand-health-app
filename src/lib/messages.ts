@@ -101,12 +101,15 @@ export async function getMessagableClinicians(): Promise<ClinicianOption[]> {
   const clinicId = user.clinicId;
   if (!clinicId) return [];
 
+  // Only ACTIVE clinicians — a deactivated clinician can't read their inbox,
+  // so offering them as a recipient would send messages into a void.
   const clinicians = await withAuth(user, (sql) =>
     sql`
       SELECT p.id, p.first_name, p.last_name, cp.title
       FROM profiles p
-      LEFT JOIN clinician_profiles cp ON cp.profile_id = p.id
+      JOIN clinician_profiles cp ON cp.profile_id = p.id
       WHERE p.clinic_id = ${clinicId} AND p.role = 'clinician'
+        AND cp.deactivated_at IS NULL
       ORDER BY p.last_name ASC
     `
   );

@@ -7,6 +7,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getUser } from "@/lib/auth/server";
 import { withAuth } from "@/lib/db/connection";
+import { canAccessPatient } from "@/lib/care-team";
 import { recordAudit } from "@/lib/audit";
 import {
   getAdherenceReport,
@@ -33,6 +34,16 @@ export async function GET(req: NextRequest) {
 
   const user = await getUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  // Explicit access check (2026-07-14 review): the old "can I see the profile
+  // row" probe passed for ANY clinician in the clinic, because profiles are
+  // clinic-wide — leaking the patient's name in the CSV header/filename even
+  // though RLS returned an empty report. Patients: own data only; clinicians:
+  // admin or care-team, same rule as the message stream route.
+  const allowed =
+    (user.role === "patient" && user.id === patientId) ||
+    (user.role === "clinician" && (await canAccessPatient(user, patientId)));
+  if (!allowed) return NextResponse.json({ error: "forbidden" }, { status: 403 });
 
   const windowDays: MedAdherenceWindow =
     (ALLOWED.find((n) => String(n) === winParam) ?? 30) as MedAdherenceWindow;

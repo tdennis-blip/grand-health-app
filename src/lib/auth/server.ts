@@ -75,16 +75,22 @@ export async function getUser(): Promise<AuthUser | null> {
   }
 }
 
-// Does a profile row exist for this id? A valid token whose `sub` has no
-// profile is an orphaned session (e.g. the account was deleted) — we treat it
-// as signed-out rather than rendering an empty shell. Cached per request.
-// On any DB error we return true so a transient outage never locks users out.
-const profileExists = cache(async (id: string): Promise<boolean> => {
+// Is this a usable account? A valid token whose `sub` has no profile is an
+// orphaned session (e.g. the account was deleted); a deactivated patient
+// keeps their Cognito login but must be treated as signed-out (soft-delete,
+// migration 0036 — mirrors clinician deactivation from 0035). Cached per
+// request. On any DB error we return "ok" so a transient outage never locks
+// users out (deactivated users are also fenced at the DB layer by RLS).
+const accountUsable = cache(async (id: string): Promise<boolean> => {
   try {
-    const rows = await serviceRoleSql<{ one: number }[]>`
-      SELECT 1 AS one FROM public.profiles WHERE id = ${id} LIMIT 1
+    const rows = await serviceRoleSql<{ patient_deactivated: boolean | null }[]>`
+      SELECT pp.deactivated_at IS NOT NULL AS patient_deactivated
+      FROM public.profiles p
+      LEFT JOIN public.patient_profiles pp ON pp.profile_id = p.id
+      WHERE p.id = ${id} LIMIT 1
     `;
-    return rows.length > 0;
+    if (rows.length === 0) return false;       // orphaned session
+    return rows[0].patient_deactivated !== true; // deactivated patient → out
   } catch {
     return true;
   }
@@ -98,15 +104,37 @@ export async function requireUser(): Promise<AuthUser> {
     const { redirect } = await import("next/navigation");
     redirect("/login");
   }
-  // Orphaned session: token is valid but the profile is gone → full sign-out.
-  if (!(await profileExists(user!.id))) {
+  // Orphaned session (profile gone) or deactivated patient → full sign-out.
+  if (!(await accountUsable(user!.id))) {
     const { redirect } = await import("next/navigation");
     redirect("/auth/force-signout");
   }
   return user as AuthUser;
 }
 
+// MFA enrollment check, cached per request so a page that calls
+// requireClinician() in the layout AND in several server actions only hits
+// Cognito AdminGetUser once per render. userHasTotpMfa fails CLOSED.
+const clinicianHasMfa = cache(async (email: string): Promise<boolean> => {
+  const { userHasTotpMfa } = await import("@/lib/cognito-admin");
+  return userHasTotpMfa(email);
+});
+
+// Clinician gate INCLUDING the MFA gate. Every clinician-facing page, server
+// action, and route handler goes through here, so MFA can't be bypassed by
+// invoking an action or API route directly (the old layout-only gate could).
 export async function requireClinician(): Promise<AuthUser> {
+  const user = await requireClinicianAllowUnenrolled();
+  if (!(await clinicianHasMfa(user.email))) {
+    const { redirect } = await import("next/navigation");
+    redirect("/mfa-setup");
+  }
+  return user;
+}
+
+// Clinician gate WITHOUT the MFA check. Only for /mfa-setup itself (which
+// must be reachable by un-enrolled clinicians — anything else would loop).
+export async function requireClinicianAllowUnenrolled(): Promise<AuthUser> {
   const user = await requireUser();
   if (user.role !== "clinician") {
     const { redirect } = await import("next/navigation");

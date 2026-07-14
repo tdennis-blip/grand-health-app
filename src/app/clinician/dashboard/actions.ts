@@ -32,6 +32,13 @@ export async function createUserAccount(input: z.infer<typeof createUserSchema>)
   const user = await requireClinician();
   const clinicId = user.clinicId;
 
+  // Staff accounts are an admin-only provision. Any clinician may add
+  // patients, but minting new clinician logins (clinic-wide profile reads,
+  // libraries, etc.) must go through an admin.
+  if (role === "clinician" && !(await isAdminClinician(user.id))) {
+    return { ok: false, error: "Only administrators can create staff accounts." };
+  }
+
   let sub: string;
   try {
     sub = await createCognitoUser({ email: email.toLowerCase(), role, clinicId });
@@ -99,15 +106,76 @@ export async function createUserAccount(input: z.infer<typeof createUserSchema>)
   return { ok: true, email: email.toLowerCase() };
 }
 
+// Deactivate (soft-delete) or reactivate a patient. This is the default way
+// to "remove" a patient: the login stops working (requireUser + RLS, 0036)
+// but the medical record is retained, as HIPAA/state retention rules expect.
+// Admin-only, mirroring staff deactivation.
+export async function setPatientActive(
+  input: { patientId: string; active: boolean }
+): Promise<{ ok: boolean; error?: string }> {
+  const parsed = z.object({ patientId: z.string().uuid(), active: z.boolean() }).safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Invalid patient." };
+  const { patientId, active } = parsed.data;
+
+  const user = await requireClinician();
+  if (!(await isAdminClinician(user.id))) {
+    return { ok: false, error: "Only administrators can deactivate or reactivate patients." };
+  }
+
+  const [target] = await serviceRoleSql<{ clinic_id: string; deactivated_at: string | null }[]>`
+    SELECT clinic_id, deactivated_at FROM public.patient_profiles
+    WHERE profile_id = ${patientId} LIMIT 1
+  `;
+  if (!target) return { ok: false, error: "Patient not found." };
+  if (target.clinic_id !== user.clinicId) return { ok: false, error: "Not in your clinic." };
+  if ((target.deactivated_at === null) === active) return { ok: true }; // no-op
+
+  await serviceRoleSql`
+    UPDATE public.patient_profiles
+    SET deactivated_at = ${active ? null : new Date().toISOString()}
+    WHERE profile_id = ${patientId} AND clinic_id = ${user.clinicId}
+  `;
+
+  // Also disable/re-enable the Cognito login (best-effort — the DB flag is
+  // authoritative and requireUser/RLS already fence deactivated patients).
+  try {
+    const [prof] = await serviceRoleSql<{ email: string }[]>`
+      SELECT email FROM public.profiles WHERE id = ${patientId} LIMIT 1
+    `;
+    if (prof?.email) {
+      const { setCognitoUserEnabled } = await import("@/lib/cognito-admin");
+      await setCognitoUserEnabled(prof.email, active);
+    }
+  } catch (err) {
+    console.error("setPatientActive: Cognito enable/disable failed", { patientId, active, err });
+  }
+
+  await recordAudit({
+    action: "update",
+    entityType: "patient_deactivation",
+    entityId: patientId,
+    patientId,
+    meta: { active },
+  }).catch(() => undefined);
+
+  revalidatePath("/clinician/dashboard");
+  revalidatePath(`/clinician/patient/${patientId}`);
+  return { ok: true };
+}
+
 // Permanently removes a patient: their messages, profile (cascades all PHI),
-// and Cognito login. Clinic-scoped — a clinician can only remove a patient in
-// their own clinic.
+// and Cognito login. ADMIN-ONLY and a last resort (e.g. test accounts, or a
+// verified patient request) — for routine offboarding use setPatientActive,
+// which preserves the record for retention requirements.
 export async function deletePatientAccount(input: { patientId: string }): Promise<{ ok: boolean; error?: string }> {
   const id = z.string().uuid().safeParse(input.patientId);
   if (!id.success) return { ok: false, error: "Invalid patient." };
   const patientId = id.data;
 
   const user = await requireClinician();
+  if (!(await isAdminClinician(user.id))) {
+    return { ok: false, error: "Only administrators can permanently delete a patient." };
+  }
 
   // Confirm the target is a patient in this clinician's clinic.
   const [target] = await serviceRoleSql<{ email: string; role: string; clinic_id: string }[]>`

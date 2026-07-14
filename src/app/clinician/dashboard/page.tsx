@@ -13,6 +13,7 @@ type RosterRow = {
   first_name: string | null;
   last_name: string | null;
   member_since: string;
+  is_active: boolean;
 };
 
 export default async function ClinicianDashboard() {
@@ -24,19 +25,19 @@ export default async function ClinicianDashboard() {
   const rosterRaw = isAdmin
     ? await withAuth(user, (sql) =>
         sql`
-          SELECT pp.profile_id, pp.member_since, p.email, p.first_name, p.last_name
+          SELECT pp.profile_id, pp.member_since, pp.deactivated_at, p.email, p.first_name, p.last_name
           FROM patient_profiles pp
           JOIN profiles p ON p.id = pp.profile_id
-          ORDER BY pp.member_since DESC
+          ORDER BY (pp.deactivated_at IS NOT NULL), pp.member_since DESC
         `
       )
     : await withAuth(user, (sql) =>
         sql`
-          SELECT pp.profile_id, pp.member_since, p.email, p.first_name, p.last_name
+          SELECT pp.profile_id, pp.member_since, pp.deactivated_at, p.email, p.first_name, p.last_name
           FROM patient_profiles pp
           JOIN profiles p ON p.id = pp.profile_id
           JOIN patient_care_team ct ON ct.patient_id = pp.profile_id AND ct.clinician_id = ${user.id}
-          ORDER BY pp.member_since DESC
+          ORDER BY (pp.deactivated_at IS NOT NULL), pp.member_since DESC
         `
       );
 
@@ -46,6 +47,7 @@ export default async function ClinicianDashboard() {
     first_name: r.first_name ?? null,
     last_name: r.last_name ?? null,
     member_since: r.member_since,
+    is_active: r.deactivated_at == null,
   }));
   const error = null as { message: string } | null;
 
@@ -58,7 +60,7 @@ export default async function ClinicianDashboard() {
             Patients ({rows.length})
           </div>
         </div>
-        <AddUserButton />
+        <AddUserButton canCreateStaff={isAdmin} />
       </div>
 
       {error && (
@@ -86,7 +88,7 @@ export default async function ClinicianDashboard() {
               <Link
                 key={p.profile_id}
                 href={`/clinician/patient/${p.profile_id}`}
-                className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition"
+                className={`flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition ${p.is_active ? "" : "opacity-60"}`}
               >
                 <div className="w-10 h-10 rounded-full bg-slate-200 text-slate-600 font-semibold text-xs flex items-center justify-center">
                   {initials || "?"}
@@ -94,6 +96,11 @@ export default async function ClinicianDashboard() {
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-slate-900 truncate">
                     {p.first_name} {p.last_name}
+                    {!p.is_active && (
+                      <span className="ml-2 text-[10px] font-semibold text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-full align-middle">
+                        Deactivated
+                      </span>
+                    )}
                   </div>
                   <div className="text-[11px] text-slate-500 truncate">{p.email}</div>
                 </div>

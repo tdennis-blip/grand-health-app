@@ -5,6 +5,7 @@
 // Iterates every active connection and refetches the last 2 days. Catches
 // per-connection failures so one bad token doesn't block the whole run.
 import { NextResponse, type NextRequest } from "next/server";
+import { cronTokenMatches } from "@/lib/cron-auth";
 import { daysAgo, listActiveConnections, syncConnectionRange, ymd } from "@/lib/wearables/sync";
 
 export async function POST(req: NextRequest) {
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest) {
   // Header only — never accept the token in the query string (URLs are
   // logged by ALBs/proxies, which would leak the secret).
   const got = req.headers.get("x-cron-token");
-  if (got !== expected) {
+  if (!cronTokenMatches(got, expected)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

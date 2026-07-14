@@ -39,7 +39,9 @@ export type CareTeamMember = {
   credentials: string | null;
 };
 
-// Care-team members for a patient (with role info for display).
+// Care-team members for a patient (with role info for display). Excludes
+// deactivated clinicians — patients shouldn't see staff who no longer have
+// access listed as "their team", and pickers built on this must not offer them.
 export async function getCareTeam(patientId: string): Promise<CareTeamMember[]> {
   const rows = await serviceRoleSql<
     { clinician_id: string; first_name: string | null; last_name: string | null; professional_role: string | null; role_label: string | null; title: string | null; credentials: string | null }[]
@@ -50,6 +52,7 @@ export async function getCareTeam(patientId: string): Promise<CareTeamMember[]> 
     JOIN public.profiles p ON p.id = ct.clinician_id
     LEFT JOIN public.clinician_profiles cp ON cp.profile_id = ct.clinician_id
     WHERE ct.patient_id = ${patientId}
+      AND cp.deactivated_at IS NULL
     ORDER BY p.last_name NULLS LAST, p.first_name NULLS LAST
   `;
   return rows.map((r) => ({
@@ -169,6 +172,23 @@ export async function setClinicianActive(
     SET deactivated_at = ${active ? null : new Date().toISOString()}
     WHERE profile_id = ${targetProfileId} AND clinic_id = ${actor.clinicId}
   `;
+
+  // Also disable/re-enable the Cognito login so a deactivated clinician can't
+  // authenticate at all (DB/app layers already fence them, but an active
+  // login with zero data access is still an unnecessary surface). Best-effort:
+  // the DB flag is authoritative, so a Cognito hiccup shouldn't fail the whole
+  // action — but log it loudly so it gets reconciled.
+  try {
+    const [prof] = await serviceRoleSql<{ email: string }[]>`
+      SELECT email FROM public.profiles WHERE id = ${targetProfileId} LIMIT 1
+    `;
+    if (prof?.email) {
+      const { setCognitoUserEnabled } = await import("@/lib/cognito-admin");
+      await setCognitoUserEnabled(prof.email, active);
+    }
+  } catch (err) {
+    console.error("setClinicianActive: Cognito enable/disable failed", { targetProfileId, active, err });
+  }
   return null;
 }
 

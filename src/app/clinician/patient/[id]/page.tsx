@@ -25,7 +25,7 @@ export default async function PatientDetail({ params }: { params: Promise<{ id: 
   const [patientRaw] = await withAuth(user, (sql) =>
     sql`
       SELECT pp.profile_id, pp.date_of_birth, pp.sex, pp.height_cm, pp.weight_kg,
-             p.email, p.first_name, p.last_name
+             pp.deactivated_at, p.email, p.first_name, p.last_name
       FROM patient_profiles pp
       JOIN profiles p ON p.id = pp.profile_id
       WHERE pp.profile_id = ${id}
@@ -250,6 +250,8 @@ export default async function PatientDetail({ params }: { params: Promise<{ id: 
       <RemovePatientButton
         patientId={id}
         patientName={`${profile?.first_name ?? ""} ${profile?.last_name ?? ""}`.trim() || "this patient"}
+        isAdmin={isAdmin}
+        isActive={patientRaw.deactivated_at == null}
       />
     </main>
   );

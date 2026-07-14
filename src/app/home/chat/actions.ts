@@ -15,12 +15,23 @@ export async function sendMessage(input: z.infer<typeof sendSchema>) {
   const parsed = sendSchema.parse(input);
   const user = await requirePatient();
 
-  // Sanity-check recipient is a clinician in the same clinic.
+  // Recipient must be an ACTIVE clinician in the same clinic. Deactivated
+  // clinicians can't open their inbox (RLS blocks them), so a message sent
+  // there would silently vanish — a clinical-safety problem if the patient
+  // is reporting symptoms.
   const [rcpt] = await withAuth(user, (sql) =>
-    sql`SELECT clinic_id, role FROM profiles WHERE id = ${parsed.recipientId} LIMIT 1`
+    sql`
+      SELECT p.clinic_id, p.role, cp.deactivated_at
+      FROM profiles p
+      LEFT JOIN clinician_profiles cp ON cp.profile_id = p.id
+      WHERE p.id = ${parsed.recipientId} LIMIT 1
+    `
   );
   if (!rcpt || rcpt.role !== "clinician" || rcpt.clinic_id !== user.clinicId) {
     throw new Error("Recipient must be a clinician in your clinic");
+  }
+  if (rcpt.deactivated_at != null) {
+    throw new Error("That clinician is no longer active — please message another member of your care team.");
   }
 
   const [inserted] = await withAuth(user, (sql) =>

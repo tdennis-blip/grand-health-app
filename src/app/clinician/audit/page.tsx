@@ -10,7 +10,9 @@
 // keyset pagination if a clinic ever pushes past ~50k rows.
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Filter, ScrollText } from "lucide-react";
+import { redirect } from "next/navigation";
 import { requireClinician } from "@/lib/auth/server";
+import { isAdminClinician } from "@/lib/care-team";
 import { withAuth } from "@/lib/db/connection";
 
 type SearchParams = {
@@ -112,6 +114,13 @@ export default async function ClinicianAuditLogPage({
 }) {
   const params = await searchParams;
   const user = await requireClinician();
+
+  // Admin-only: audit meta holds before/after PHI snapshots across ALL
+  // patients, so clinic-wide read access undercut the care-team model.
+  // Migration 0036 enforces the same rule at the RLS layer.
+  if (!(await isAdminClinician(user.id))) {
+    redirect("/clinician/dashboard");
+  }
 
   const page = Math.max(0, parseInt(params.page ?? "0", 10) || 0);
   const size = clamp(parseInt(params.size ?? "", 10) || PAGE_SIZE_DEFAULT, 10, 200);

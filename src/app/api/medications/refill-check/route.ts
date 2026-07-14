@@ -8,6 +8,7 @@
 // occurred_at::date) on insert.
 
 import { NextResponse, type NextRequest } from "next/server";
+import { cronTokenMatches } from "@/lib/cron-auth";
 import { serviceRoleSql } from "@/lib/db/connection";
 import { getAllRefillFindings } from "@/lib/medications-refills";
 
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest) {
   // Header only — never accept the token in the query string (URLs are
   // logged by ALBs/proxies, which would leak the secret).
   const got = req.headers.get("x-cron-token");
-  if (got !== expected) {
+  if (!cronTokenMatches(got, expected)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

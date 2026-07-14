@@ -13,11 +13,37 @@ Living orientation doc for the production app. **Read this first** when picking 
 - **DNS:** `mygrandhealth.com` is on **Squarespace**. The `staging` subdomain is delegated to Route 53 via four `NS` records (Host `staging`) pointing at: ns-1533.awsdns-63.org, ns-1833.awsdns-37.co.uk, ns-247.awsdns-30.com, ns-606.awsdns-11.net. ACM cert auto-validates through that delegated zone.
 - **CI/CD live:** push to `main` → GitHub Actions builds image → ECR → rolls the ECS service (`.github/workflows/deploy.yml`). GitHub repo has secret `AWS_DEPLOY_ROLE_ARN` + var `NEXT_PUBLIC_SITE_URL=https://staging.mygrandhealth.com`.
 - **Secret `grand-health/staging/app-env`:** real `DATABASE_URL`/`SERVICE_ROLE_DATABASE_URL` (RDS endpoint, sslmode=require), `USDA_API_KEY=DEMO_KEY`, Cloudinary name+key+**secret (set)**. **`ANTHROPIC_API_KEY` now SET** (filled 2026-06-29 — diet AI plan generator enabled). Pattern if it ever needs rotating: `put-secret-value` (read-modify-write with jq, `file://` temp) then `aws ecs update-service --cluster grand-health-staging --service grand-health-staging-web --force-new-deployment`.
-- **Test users (password `Grand1230!`):** clinician `nurse@grandhealth.local` (Dana Lopez), patient `patient1@grandhealth.local` (Sam Okafor). Created via `scripts/create-test-user.sh` + profile insert over the bastion tunnel.
+- **Test users (password: see password manager):** clinician `nurse@grandhealth.local` (Dana Lopez), patient `patient1@grandhealth.local` (Sam Okafor). Created via `scripts/create-test-user.sh` + profile insert over the bastion tunnel. (Password scrubbed from this doc 2026-07-14 — it lives in an iCloud-synced folder.)
 - **Bastion tunnel** (for psql/migrations against private RDS): `aws ssm start-session --target i-0545839633bb8fc95 --document-name AWS-StartPortForwardingSessionToRemoteHost --parameters '{"host":["<RDS endpoint above>"],"portNumber":["5432"],"localPortNumber":["5432"]}'` then `export DIRECT_DATABASE_URL="postgresql://grandhealth:<pw>@localhost:5432/grandhealth?sslmode=require"`. **It keeps dropping** because the repo lives in an **iCloud** folder — see "move to ~/dev" below.
 - **Redeploy with domain (idempotent):** `cd infra && npx cdk deploy -c stage=staging -c withService=true -c domain=staging.mygrandhealth.com -c hostedZone=staging.mygrandhealth.com`.
 
 Full ordered runbook: `docs/deploy-staging-runbook.md`.
+
+---
+
+## 📋 Session log 2026-07-14 — security-review fixes (patient deactivation, MFA everywhere, audit scope)
+
+Full review findings in `grand-health-security-review-2026-07-14.md`. Code fixes shipped this session (NOT yet deployed/migrated):
+
+**⭐ Migration `0036_patient_deactivation_and_audit_scope.sql` (NOT YET APPLIED — run via bastion tunnel):**
+- `patient_profiles.deactivated_at` + `current_patient_is_active()` helper + `active_patient_restrict` RESTRICTIVE policies on all patient-bearing tables (deactivated patient loses all DB access; clinicians keep read access for retention).
+- `audit_log` reads are now **ADMIN-ONLY** (was clinic-wide for every clinician incl. deactivated logins — meta holds PHI snapshots).
+
+**Patient offboarding reworked (A1):** `setPatientActive` server action (admin-only, audited as `patient_deactivation`, disables/enables the Cognito login). Danger zone on the patient page now offers **Deactivate/Reactivate** (primary) + **Delete permanently** (admin-only, last resort); whole section hidden for non-admins. `deletePatientAccount` is now admin-gated. Dashboard roster shows a "Deactivated" badge + sorts deactivated to the bottom. `requireUser` treats a deactivated patient like an orphaned session → `/auth/force-signout`.
+
+**MFA gate moved into `requireClinician()` (A2)** — every clinician server action and route handler now enforces TOTP, not just the layout. New `requireClinicianAllowUnenrolled()` used ONLY by `/mfa-setup` (anything else would loop). Clinician layout's own gate removed (redundant).
+
+**Cognito disable on deactivation (A3/C3):** new `setCognitoUserEnabled` in `cognito-admin.ts`, called (best-effort, logged on failure) from `setClinicianActive` and `setPatientActive`. **Needs `cdk deploy`** — task role gained `cognito-idp:AdminDisableUser/AdminEnableUser` in `infra/lib/app-runtime.ts`.
+
+**Other fixes:** audit viewer page + nav link admin-only (A4); adherence CSV route now checks `canAccessPatient` before leaking the patient name to non-care-team clinicians (A6); `recordAudit` no longer fails silently — logs greppable `AUDIT_WRITE_FAILED` (alarm on it in CloudWatch) (A7); cron-token comparison is constant-time via new `lib/cron-auth.ts` (both cron routes); `removeCareTeamMember` got a clinic guard; staff-account creation is admin-only (server action + role toggle hidden in `add-user.tsx`) (C1); patients can no longer message deactivated clinicians (picker filters + `sendMessage` rejects) and `getCareTeam` excludes deactivated staff (B1/B2); test-user password scrubbed from this doc.
+
+**⏳ TO SHIP:**
+1. `psql "$DIRECT_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/0036_patient_deactivation_and_audit_scope.sql` (bastion tunnel, owner role).
+2. `cd infra && npx cdk deploy -c stage=staging -c withService=true -c domain=staging.mygrandhealth.com -c hostedZone=staging.mygrandhealth.com` (new Cognito IAM actions).
+3. `git push` + deploy workflow.
+4. Smoke test: non-admin can't see Audit-log nav / add staff / delete patient; deactivate a test patient → login blocked (Cognito disabled), record still visible to clinician, reactivate works; clinician without MFA hitting a server action gets bounced to /mfa-setup.
+
+**⏳ Still open from the review (not code, or deferred):** rotate RDS password + Cloudinary secret + GitHub token and move repo out of iCloud (A5); CSP, rate limiting, idle timeout (A8); wearable token encryption at app layer; renumber duplicate migrations; patient-facing data export (B3); admin review for provider credentials (C2).
 
 ---
 
