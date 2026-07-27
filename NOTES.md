@@ -21,6 +21,23 @@ Full ordered runbook: `docs/deploy-staging-runbook.md`.
 
 ---
 
+## 📋 Session log 2026-07-27 — Cognito auth emails moved to verified SES (info@mygrandhealth.com)
+
+**Problem:** invite + password-reset emails went through the shared **Cognito default sender** (`UserPoolEmail.withCognito()`) — ~50/day cap and poor deliverability (often spam/quarantine). This was the second half of the "reset said it emailed but nothing came" issue.
+
+**⭐ Switched Cognito to send via our own SES identity.**
+- **SES domain identity `mygrandhealth.com`** created + verified in **us-east-1**, Easy DKIM (RSA_2048). DKIM = 3 CNAMEs added manually in **Squarespace** (root domain DNS is Squarespace; only the `staging` subdomain is delegated to Route 53, so this couldn't be automated). Domain shows **Verified**.
+- **`infra/lib/grand-health-stack.ts`**: `UserPoolEmail.withCognito()` → `withSES({ fromEmail: "info@mygrandhealth.com", fromName: "Grand Health", sesRegion: "us-east-1", sesVerifiedDomain: "mygrandhealth.com", replyTo: "info@mygrandhealth.com" })`.
+- **Deployed** (commit `84217fd`) via `cdk deploy` with the full `-c withService=true -c domain=... -c hostedZone=...` context. `cdk diff` showed ONLY the UserPool `EmailConfiguration` change (`COGNITO_DEFAULT` → `DEVELOPER` + From/ReplyTo/SourceArn) — no RDS/other churn. Verified live: `describe-user-pool` → `EmailSendingAccount: DEVELOPER`, `SourceArn: arn:aws:ses:us-east-1:669960694177:identity/mygrandhealth.com`.
+
+**⚠️ Sequencing rule (for future SES/domain changes):** verify the SES identity in DNS **before** deploying the Cognito `withSES` change — Cognito email sends fail if the identity isn't verified at send time.
+
+**⏳ PENDING — SES production access (requested 2026-07-27, ~24h approval).** SES is still in the **sandbox**, so sends only reach **verified recipient addresses** until access is granted. Transactional use case submitted (Cognito invites + reset codes, <100/day, own users only). Once approved: do a live password-reset / resend-invite test → confirm email arrives **from info@mygrandhealth.com**. Until then, test by verifying a single recipient email identity in SES.
+
+**⏳ Optional deliverability follow-up:** custom MAIL FROM subdomain (`mail.mygrandhealth.com`, MX + SPF TXT in Squarespace) for SPF alignment — not done. Also still open: fix the misleading error-swallow in `login/page.tsx` `handleForgotRequest` (surfaces "a code has been sent" even when ForgotPassword fails).
+
+---
+
 ## 📋 Session log 2026-07-27 — admin "Resend invite" for expired patient temp passwords
 
 **Problem:** a patient was invited (`AdminCreateUser` emails a temp password) but never completed first sign-in, so the 7-day `tempPasswordValidity` temp password expired. They tried self-service "Forgot password," which **can't** rescue a `FORCE_CHANGE_PASSWORD` user — Cognito refuses `ForgotPassword` in that state. Compounding it, `login/page.tsx` `handleForgotRequest` swallows every non-`LimitExceededException` error and still shows "a code has been sent," so the failure was invisible (the UI lied). No in-app way to re-issue the invite existed — only the AWS CLI.
