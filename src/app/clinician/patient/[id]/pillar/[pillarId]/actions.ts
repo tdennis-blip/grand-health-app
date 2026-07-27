@@ -552,6 +552,111 @@ export async function moveRec(args: { recId: string; pillarId: string; patientId
   revalidate(args.patientId, args.pillarId);
 }
 
+// ============================================================
+// CANCER SCREENINGS (Cancer pillar "Screening" tab)
+// ============================================================
+
+const screeningUpdateSchema = z.object({
+  screeningId: z.string().uuid(),
+  pillarId: z.string().uuid(),
+  patientId: z.string().uuid(),
+  test: z.string().min(1).max(200),
+  lastPerformed: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
+  results: z.string().max(2000).nullish(),
+  nextDue: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
+});
+
+export async function addBlankScreening(args: { pillarId: string; patientId: string; test?: string }) {
+  const user = await requireClinician();
+
+  const [pillar] = await withAuth(user, (sql) =>
+    sql`SELECT clinic_id FROM pillars WHERE id = ${args.pillarId} LIMIT 1`
+  );
+  if (!pillar) throw new Error("Pillar not found");
+
+  const [maxRow] = await withAuth(user, (sql) =>
+    sql`SELECT sort_order FROM pillar_screenings WHERE pillar_id = ${args.pillarId} ORDER BY sort_order DESC LIMIT 1`
+  );
+  const nextSortOrder = (maxRow?.sort_order ?? -1) + 1;
+
+  const testName = (args.test ?? "").trim() || "New screening";
+  const [inserted] = await withAuth(user, (sql) =>
+    sql`INSERT INTO pillar_screenings (clinic_id, patient_id, pillar_id, test, sort_order) VALUES (${pillar.clinic_id}, ${args.patientId}, ${args.pillarId}, ${testName}, ${nextSortOrder}) RETURNING id`
+  );
+  if (!inserted) throw new Error("Insert failed");
+
+  await recordAudit({
+    action: "create",
+    entityType: "pillar_screening",
+    entityId: inserted.id,
+    patientId: args.patientId,
+    meta: { test: testName },
+  });
+
+  revalidate(args.patientId, args.pillarId);
+  return inserted.id;
+}
+
+export async function updateScreening(input: z.infer<typeof screeningUpdateSchema>) {
+  const parsed = screeningUpdateSchema.parse(input);
+  const user = await requireClinician();
+
+  const [before] = await withAuth(user, (sql) =>
+    sql`SELECT test, last_performed::text, results, next_due::text FROM pillar_screenings WHERE id = ${parsed.screeningId} LIMIT 1`
+  );
+
+  await withAuth(user, (sql) =>
+    sql`UPDATE pillar_screenings SET test = ${parsed.test}, last_performed = ${parsed.lastPerformed ?? null}, results = ${parsed.results ?? null}, next_due = ${parsed.nextDue ?? null}, updated_at = ${new Date().toISOString()} WHERE id = ${parsed.screeningId}`
+  );
+
+  await recordAudit({
+    action: "update",
+    entityType: "pillar_screening",
+    entityId: parsed.screeningId,
+    patientId: parsed.patientId,
+    meta: { before },
+  });
+
+  revalidate(parsed.patientId, parsed.pillarId);
+}
+
+export async function deleteScreening(args: { screeningId: string; pillarId: string; patientId: string }) {
+  const user = await requireClinician();
+
+  const [before] = await withAuth(user, (sql) =>
+    sql`SELECT test FROM pillar_screenings WHERE id = ${args.screeningId} LIMIT 1`
+  );
+  await withAuth(user, (sql) => sql`DELETE FROM pillar_screenings WHERE id = ${args.screeningId}`);
+
+  await recordAudit({
+    action: "delete",
+    entityType: "pillar_screening",
+    entityId: args.screeningId,
+    patientId: args.patientId,
+    meta: { before },
+  });
+
+  revalidate(args.patientId, args.pillarId);
+}
+
+export async function toggleScreeningHidden(args: { screeningId: string; hidden: boolean; pillarId: string; patientId: string }) {
+  const user = await requireClinician();
+
+  await withAuth(user, (sql) =>
+    sql`UPDATE pillar_screenings SET hidden = ${args.hidden}, updated_at = ${new Date().toISOString()} WHERE id = ${args.screeningId}`
+  );
+
+  await recordAudit({
+    action: "update",
+    entityType: "pillar_screening",
+    entityId: args.screeningId,
+    patientId: args.patientId,
+    meta: { hidden: args.hidden },
+  });
+
+  revalidate(args.patientId, args.pillarId);
+}
+
 // ---------- Reorder factors (move up/down) ----------
 
 export async function moveFactor(args: {

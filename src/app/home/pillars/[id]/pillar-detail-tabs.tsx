@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Zap, Clock, Stethoscope, Info, Pill } from "lucide-react";
+import { Zap, Clock, Stethoscope, Info, Pill, ShieldCheck } from "lucide-react";
+import {
+  dueStatus,
+  DUE_STATUS_CHIP,
+  DUE_STATUS_LABEL,
+  formatDate,
+} from "@/lib/screening";
 
 type Status = "on-target" | "borderline" | "off-target";
 type Weight = "low" | "medium" | "high";
@@ -27,6 +33,13 @@ type Rec = {
   cadence: string | null;
   status: "active" | "review" | "paused";
   link: string | null;
+};
+type Screening = {
+  id: string;
+  test: string;
+  lastPerformed: string | null;
+  results: string | null;
+  nextDue: string | null;
 };
 type LinkedMed = {
   id: string;
@@ -54,28 +67,39 @@ const STATUS_LABEL: Record<Status, string> = {
 
 export function PillarDetailTabs({
   clinicianNote,
+  pillarKind,
   factors,
   drivers,
   recs,
+  screenings = [],
   linkedMeds = [],
 }: {
   clinicianNote: string | null;
+  pillarKind?: string;
   factors: Factor[];
   drivers: Driver[];
   recs: Rec[];
+  screenings?: Screening[];
   linkedMeds?: LinkedMed[];
 }) {
-  const [tab, setTab] = useState<"actions" | "risks" | "about">("actions");
+  // The Cancer pillar shows a read-only "Screening" tab in place of the
+  // "Recommendations" tab.
+  const isCancer = pillarKind === "cancer";
+  const [tab, setTab] = useState<"actions" | "screening" | "risks" | "about">(
+    isCancer ? "screening" : "actions"
+  );
 
   const active = recs.filter((r) => r.status === "active");
   const review = recs.filter((r) => r.status === "review");
   // Paused recs aren't shown to the patient.
 
   const tabs = [
-    { id: "actions", label: "Recommendations", count: active.length + review.length },
-    { id: "risks",   label: "Risks",           count: factors.length },
-    { id: "about",   label: "About",           count: null as number | null },
-  ] as const;
+    isCancer
+      ? { id: "screening" as const, label: "Screening", count: screenings.length }
+      : { id: "actions" as const,   label: "Recommendations", count: active.length + review.length },
+    { id: "risks" as const,   label: "Risks",           count: factors.length },
+    { id: "about" as const,   label: "About",           count: null as number | null },
+  ];
 
   return (
     <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
@@ -100,6 +124,10 @@ export function PillarDetailTabs({
 
       {tab === "actions" && (
         <ActionsTab active={active} review={review} linkedMeds={linkedMeds} />
+      )}
+
+      {tab === "screening" && (
+        <ScreeningTab screenings={screenings} />
       )}
 
       {tab === "risks" && (
@@ -226,6 +254,50 @@ function RecCard({ rec, rank, review }: { rec: Rec; rank?: number; review?: bool
             <span className="text-slate-500">Why · </span>{rec.why}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ----- Screening (Cancer pillar, read-only) -----
+
+function ScreeningTab({ screenings }: { screenings: Screening[] }) {
+  if (screenings.length === 0) {
+    return (
+      <div className="text-sm text-slate-500 italic py-6 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200">
+        No screenings scheduled yet. Your clinician will add them here.
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-2.5 pt-2">
+      {screenings.map((s) => {
+        const status = dueStatus(s.nextDue);
+        return (
+          <div key={s.id} className="bg-white border border-slate-200 rounded-2xl p-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="text-[13.5px] font-semibold text-slate-900 truncate">{s.test}</div>
+              <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full border ${DUE_STATUS_CHIP[status]} flex-shrink-0`}>
+                {DUE_STATUS_LABEL[status]}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              <Kv label="Last performed" value={formatDate(s.lastPerformed)} />
+              <Kv label="Next due" value={formatDate(s.nextDue)} />
+            </div>
+            {s.results && (
+              <div className="text-[12px] text-slate-700 leading-snug mt-2 bg-slate-50 rounded-lg p-2 border border-slate-100">
+                <span className="text-slate-500">Results · </span>{s.results}
+              </div>
+            )}
+          </div>
+        );
+      })}
+      <div className="bg-teal-50 border border-teal-200 rounded-2xl p-3 flex items-start gap-2">
+        <ShieldCheck size={14} className="text-teal-700 mt-0.5 flex-shrink-0" />
+        <div className="text-[12px] text-teal-900 leading-snug">
+          Your screening schedule is set by your care team. Message them with any questions about timing.
+        </div>
       </div>
     </div>
   );

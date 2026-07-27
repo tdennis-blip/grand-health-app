@@ -7,7 +7,8 @@ import { FactorRow, type Factor } from "./factor-row";
 import { RiskActions } from "./risk-actions";
 import { DriverRow, type Driver } from "./driver-row";
 import { RecRow, type Recommendation } from "./rec-row";
-import { addBlankDriver, addBlankRec } from "./actions";
+import { ScreeningRow, ScreeningPresetsDatalist, type Screening } from "./screening-row";
+import { addBlankDriver, addBlankRec, addBlankScreening } from "./actions";
 
 type LibFactor = {
   id: string;
@@ -36,6 +37,7 @@ export function PillarTabs({
   factors,
   drivers,
   recs,
+  screenings,
   libraryFactors,
   librarySets,
 }: {
@@ -48,19 +50,24 @@ export function PillarTabs({
   factors: Factor[];
   drivers: Driver[];
   recs: Recommendation[];
+  screenings: Screening[];
   libraryFactors: LibFactor[];
   librarySets: LibSet[];
 }) {
-  const [tab, setTab] = useState<"risks" | "drivers" | "recs" | "note">("risks");
+  // The Cancer pillar swaps its "Recommendations" tab for a "Screening" tab.
+  const isCancer = pillarKind === "cancer";
+  const [tab, setTab] = useState<"risks" | "drivers" | "recs" | "screening" | "note">("risks");
 
   const tabs: ReadonlyArray<{
-    id: "risks" | "drivers" | "recs" | "note";
+    id: "risks" | "drivers" | "recs" | "screening" | "note";
     label: string;
     count?: number;
   }> = [
     { id: "risks",   label: "Risks",           count: factors.length },
     { id: "drivers", label: "Lifestyle drivers", count: drivers.length },
-    { id: "recs",    label: "Recommendations", count: recs.length },
+    isCancer
+      ? { id: "screening" as const, label: "Screening", count: screenings.length }
+      : { id: "recs" as const,      label: "Recommendations", count: recs.length },
     { id: "note",    label: "Clinician note" },
   ];
 
@@ -101,6 +108,9 @@ export function PillarTabs({
       )}
       {tab === "recs" && (
         <RecsTab patientId={patientId} pillarId={pillarId} recs={recs} />
+      )}
+      {tab === "screening" && (
+        <ScreeningTab patientId={patientId} pillarId={pillarId} screenings={screenings} />
       )}
       {tab === "note" && (
         <div className="pt-2">
@@ -227,6 +237,50 @@ function DriversTab({
               patientId={patientId}
               pillarId={pillarId}
             />
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+function ScreeningTab({
+  patientId,
+  pillarId,
+  screenings,
+}: {
+  patientId: string;
+  pillarId: string;
+  screenings: Screening[];
+}) {
+  const [pending, startTransition] = useTransition();
+  return (
+    <>
+      <ScreeningPresetsDatalist />
+      <div className="flex items-center justify-between gap-2 pt-2">
+        <div>
+          <div className="text-[11px] uppercase tracking-wide text-slate-500 font-semibold">Screening schedule</div>
+          <div className="text-[11px] text-slate-500">Track each test, when it was last done, results, and when it&apos;s next due.</div>
+        </div>
+        <button
+          onClick={() => startTransition(() => addBlankScreening({ patientId, pillarId }))}
+          disabled={pending}
+          className={`text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1 ${
+            pending ? "bg-slate-200 text-slate-500" : "bg-teal-700 text-white hover:bg-teal-800"
+          }`}
+        >
+          <Plus size={13} /> {pending ? "Adding…" : "Add test"}
+        </button>
+      </div>
+
+      {screenings.length === 0 ? (
+        <div className="text-sm text-slate-500 italic py-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200">
+          No screenings yet. Click &quot;Add test&quot; to start the schedule.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {screenings.map((s) => (
+            <ScreeningRow key={s.id} screening={s} patientId={patientId} pillarId={pillarId} />
           ))}
         </div>
       )}

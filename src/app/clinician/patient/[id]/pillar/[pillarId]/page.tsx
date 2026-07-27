@@ -18,7 +18,7 @@ export default async function PillarEditPage({
 
   if (!pillar || pillar.patient_id !== id) notFound();
 
-  const [patient, factors, drivers, recs, libFactors, libSetsRaw] = await Promise.all([
+  const [patient, factors, drivers, recs, screenings, libFactors, libSetsRaw] = await Promise.all([
     withAuth(user, (sql) =>
       sql`SELECT first_name, last_name FROM profiles WHERE id = ${id} LIMIT 1`
     ).then((rows) => rows[0] ?? null),
@@ -30,6 +30,9 @@ export default async function PillarEditPage({
     ),
     withAuth(user, (sql) =>
       sql`SELECT id, title, why, cadence, status, link, hidden, sort_order FROM pillar_recommendations WHERE pillar_id = ${pillarId} ORDER BY sort_order ASC`
+    ),
+    withAuth(user, (sql) =>
+      sql`SELECT id, test, last_performed::text, results, next_due::text, hidden, sort_order FROM pillar_screenings WHERE pillar_id = ${pillarId} ORDER BY next_due ASC NULLS LAST, sort_order ASC`
     ),
     withAuth(user, (sql) =>
       sql`SELECT id, name, unit, default_goal, weight, default_status, source, category FROM risk_factor_library ORDER BY category ASC, name ASC`
@@ -95,6 +98,14 @@ export default async function PillarEditPage({
           status: r.status as "active" | "review" | "paused",
           link: r.link,
           hidden: r.hidden,
+        }))}
+        screenings={screenings.map((s) => ({
+          id: s.id,
+          test: s.test,
+          lastPerformed: s.last_performed,
+          results: s.results,
+          nextDue: s.next_due,
+          hidden: s.hidden,
         }))}
         libraryFactors={libFactors.map((f) => ({
           id: f.id,

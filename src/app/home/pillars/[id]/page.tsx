@@ -27,7 +27,7 @@ export default async function PatientPillarDetail({ params }: { params: Promise<
 
   if (!pillar || pillar.hidden) notFound();
 
-  const [factors, drivers, recs, linkedMeds] = await Promise.all([
+  const [factors, drivers, recs, screenings, linkedMeds] = await Promise.all([
     withAuth(user, (sql) =>
       sql`SELECT id, name, current_value, unit, goal, status, weight, source, note, hidden, sort_order FROM pillar_factors WHERE pillar_id = ${id} AND hidden = false ORDER BY sort_order ASC`
     ),
@@ -36,6 +36,9 @@ export default async function PatientPillarDetail({ params }: { params: Promise<
     ),
     withAuth(user, (sql) =>
       sql`SELECT id, title, why, cadence, status, link, hidden, sort_order FROM pillar_recommendations WHERE pillar_id = ${id} AND hidden = false ORDER BY sort_order ASC`
+    ),
+    withAuth(user, (sql) =>
+      sql`SELECT id, test, last_performed::text, results, next_due::text FROM pillar_screenings WHERE pillar_id = ${id} AND hidden = false ORDER BY next_due ASC NULLS LAST, sort_order ASC`
     ),
     getMedicationsForPillar(id, user),
   ]);
@@ -90,6 +93,7 @@ export default async function PatientPillarDetail({ params }: { params: Promise<
 
       <PillarDetailTabs
         clinicianNote={pillar.clinician_note}
+        pillarKind={pillar.kind}
         factors={factors.map((f) => ({
           id: f.id,
           name: f.name,
@@ -109,6 +113,13 @@ export default async function PatientPillarDetail({ params }: { params: Promise<
           cadence: r.cadence,
           status: r.status as "active" | "review" | "paused",
           link: r.link,
+        }))}
+        screenings={screenings.map((s) => ({
+          id: s.id,
+          test: s.test,
+          lastPerformed: s.last_performed,
+          results: s.results,
+          nextDue: s.next_due,
         }))}
         linkedMeds={linkedMeds.map((m) => ({
           id: m.id,

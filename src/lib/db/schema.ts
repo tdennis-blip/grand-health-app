@@ -279,6 +279,38 @@ export const pillarRecommendations = pgTable(
 );
 
 // ----------------------------------------------------------------------
+// Per-pillar screening schedule (Cancer pillar "Screening" tab)
+// ----------------------------------------------------------------------
+
+export const pillarScreenings = pgTable(
+  "pillar_screenings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clinicId: uuid("clinic_id")
+      .notNull()
+      .references(() => clinics.id, { onDelete: "restrict" }),
+    patientId: uuid("patient_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    pillarId: uuid("pillar_id")
+      .notNull()
+      .references(() => pillars.id, { onDelete: "cascade" }),
+    test: text("test").notNull(),
+    lastPerformed: date("last_performed"),
+    results: text("results"),
+    nextDue: date("next_due"),
+    hidden: boolean("hidden").default(false).notNull(),
+    sortOrder: integer("sort_order").default(0).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    pillarIdx: index("pillar_screenings_pillar_idx").on(t.pillarId),
+    patientIdx: index("pillar_screenings_patient_idx").on(t.patientId),
+  })
+);
+
+// ----------------------------------------------------------------------
 // Risk-factor library (clinic-wide reusable definitions + saved sets)
 // ----------------------------------------------------------------------
 
