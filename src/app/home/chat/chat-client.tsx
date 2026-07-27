@@ -194,7 +194,9 @@ export function PatientChatClient({
 
 function clinicianLabel(c: ClinicianOption): string {
   const name = `${c.firstName ?? ""} ${c.lastName ?? ""}`.trim() || "Clinician";
-  return c.title ? `${c.title} ${name.split(" ").pop()}` : `Dr. ${name.split(" ").pop()}`;
+  // Only prefix a title the clinician actually set (e.g. "Dr.", "PA", "RN").
+  // Never assume "Dr." — not everyone on the care team is a physician.
+  return c.title ? `${c.title} ${c.lastName ?? name}`.trim() : name;
 }
 
 function MessageBubble({

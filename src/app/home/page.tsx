@@ -454,7 +454,7 @@ function timeAgo(iso: string): string {
 }
 
 function initials(name: string | null): string {
-  if (!name) return "Dr";
+  if (!name) return "CT"; // "Care team" — don't assume the sender is a doctor
   const parts = name.split(" ").filter(Boolean);
   return parts.map((p) => p[0]).slice(0, 2).join("").toUpperCase();
 }

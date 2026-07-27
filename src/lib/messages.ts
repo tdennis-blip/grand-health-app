@@ -22,6 +22,17 @@ export type {
 } from "./messages-shared";
 export { displayName } from "./messages-shared";
 
+// postgres-js returns timestamptz columns as JS Date objects, but Message
+// types them as ISO strings (and the client/sort code assumes strings — e.g.
+// String.localeCompare in the inbox sort). Coerce here so the declared type is
+// actually true everywhere and the inbox sort can't crash on a Date.
+function toIso(v: unknown): string | null {
+  if (v == null) return null;
+  if (typeof v === "string") return v;
+  if (v instanceof Date) return v.toISOString();
+  return String(v);
+}
+
 function mapRow(r: any): Message {
   return {
     id: r.id,
@@ -31,8 +42,8 @@ function mapRow(r: any): Message {
     senderRole: r.sender_role,
     recipientId: r.recipient_id,
     body: r.body,
-    recipientReadAt: r.recipient_read_at,
-    createdAt: r.created_at,
+    recipientReadAt: toIso(r.recipient_read_at),
+    createdAt: toIso(r.created_at) ?? "",
   };
 }
 
