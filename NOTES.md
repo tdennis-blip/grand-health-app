@@ -21,6 +21,21 @@ Full ordered runbook: `docs/deploy-staging-runbook.md`.
 
 ---
 
+## 📋 Session log 2026-07-27 — admin "Resend invite" for expired patient temp passwords
+
+**Problem:** a patient was invited (`AdminCreateUser` emails a temp password) but never completed first sign-in, so the 7-day `tempPasswordValidity` temp password expired. They tried self-service "Forgot password," which **can't** rescue a `FORCE_CHANGE_PASSWORD` user — Cognito refuses `ForgotPassword` in that state. Compounding it, `login/page.tsx` `handleForgotRequest` swallows every non-`LimitExceededException` error and still shows "a code has been sent," so the failure was invisible (the UI lied). No in-app way to re-issue the invite existed — only the AWS CLI.
+
+**⭐ New admin action: Resend invite.** `AdminCreateUser` with `MessageAction: "RESEND"` re-sends the invitation with a fresh temp password and resets the validity clock (does NOT create a new user). Only valid while the user is still `FORCE_CHANGE_PASSWORD`; Cognito throws `UnsupportedUserStateException` once they've set a permanent password (surfaced as a friendly "already set up — use Forgot password" message).
+- `lib/cognito-admin.ts`: new `resendCognitoInvite(email)` + `InviteAlreadyAcceptedError`. No IAM change — task role already has `cognito-idp:AdminCreateUser`.
+- `dashboard/actions.ts`: new `resendPatientInvite({patientId})` server action — admin-only, clinic-scoped, audited as `patient_invite_resend`.
+- `patient/[id]/remove-patient.tsx`: **Resend invite** button in the Danger zone (admin-only), with success/error inline notices.
+
+**Shipped** commit `5aa359e` → pushed to `main` → deploy workflow. No migration, no `cdk deploy` needed (pure app code). Typecheck clean.
+
+**⏳ Follow-ups:** (1) fix the misleading swallow in `login/page.tsx` so real ForgotPassword failures surface instead of always saying "a code has been sent"; (2) **move Cognito email to verified SES** — invite + reset emails still go through the default Cognito sender (~50/day cap, poor deliverability). Cost is negligible at our volume (~$0.10/1k emails, covered by free-tier credits).
+
+---
+
 ## 📋 Session log 2026-07-14 — security-review fixes (patient deactivation, MFA everywhere, audit scope)
 
 Full review findings in `../grand-health-security-review-2026-07-14.md` (kept outside the repo, next to it in the App folder). **Status: FULLY DEPLOYED same day** — migration 0036 applied + verified on staging via bastion tunnel (bastion still `i-095fa0c1ee773c850`); `cdk deploy` ran clean (new Cognito IAM actions live; RDS "may be replaced" warning was the known conservative CFN flag — no replacement, snapshot `pre-0036-deploy-20260714` taken first, and the snapshot output confirmed **RDS encryption at rest = true**, closing that open item); commit `2d86e769` pushed + deploy workflow ran; ECS image tag verified = commit SHA.
