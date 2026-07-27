@@ -160,9 +160,20 @@ export class GrandHealthStack extends cdk.Stack {
         tempPasswordValidity: cdk.Duration.days(7),
       },
       accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
-      // Emails sent via Cognito default SES sandbox for staging.
-      // For prod: configure a verified SES identity and set emailSettings.
-      email: cognito.UserPoolEmail.withCognito(),
+      // Emails (invites, password-reset codes) sent via our own verified SES
+      // identity instead of the shared Cognito default sender (~50/day cap +
+      // poor deliverability). The `mygrandhealth.com` domain identity must be
+      // verified in SES (us-east-1) with DKIM published in Squarespace DNS
+      // BEFORE deploying this — otherwise Cognito email sends fail.
+      // Note: SES starts in sandbox (verified recipients only); request
+      // production access to email arbitrary patient addresses.
+      email: cognito.UserPoolEmail.withSES({
+        fromEmail: "info@mygrandhealth.com",
+        fromName: "Grand Health",
+        sesRegion: "us-east-1",
+        sesVerifiedDomain: "mygrandhealth.com",
+        replyTo: "info@mygrandhealth.com",
+      }),
       removalPolicy: isProd ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
     });
 
