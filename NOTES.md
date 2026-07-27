@@ -23,9 +23,9 @@ Full ordered runbook: `docs/deploy-staging-runbook.md`.
 
 ## 📋 Session log 2026-07-14 — security-review fixes (patient deactivation, MFA everywhere, audit scope)
 
-Full review findings in `grand-health-security-review-2026-07-14.md`. Code fixes shipped this session (NOT yet deployed/migrated):
+Full review findings in `../grand-health-security-review-2026-07-14.md` (kept outside the repo, next to it in the App folder). **Status: FULLY DEPLOYED same day** — migration 0036 applied + verified on staging via bastion tunnel (bastion still `i-095fa0c1ee773c850`); `cdk deploy` ran clean (new Cognito IAM actions live; RDS "may be replaced" warning was the known conservative CFN flag — no replacement, snapshot `pre-0036-deploy-20260714` taken first, and the snapshot output confirmed **RDS encryption at rest = true**, closing that open item); commit `2d86e769` pushed + deploy workflow ran; ECS image tag verified = commit SHA.
 
-**⭐ Migration `0036_patient_deactivation_and_audit_scope.sql` (NOT YET APPLIED — run via bastion tunnel):**
+**⭐ Migration `0036_patient_deactivation_and_audit_scope.sql` (✅ APPLIED to staging 2026-07-14):**
 - `patient_profiles.deactivated_at` + `current_patient_is_active()` helper + `active_patient_restrict` RESTRICTIVE policies on all patient-bearing tables (deactivated patient loses all DB access; clinicians keep read access for retention).
 - `audit_log` reads are now **ADMIN-ONLY** (was clinic-wide for every clinician incl. deactivated logins — meta holds PHI snapshots).
 
@@ -37,11 +37,9 @@ Full review findings in `grand-health-security-review-2026-07-14.md`. Code fixes
 
 **Other fixes:** audit viewer page + nav link admin-only (A4); adherence CSV route now checks `canAccessPatient` before leaking the patient name to non-care-team clinicians (A6); `recordAudit` no longer fails silently — logs greppable `AUDIT_WRITE_FAILED` (alarm on it in CloudWatch) (A7); cron-token comparison is constant-time via new `lib/cron-auth.ts` (both cron routes); `removeCareTeamMember` got a clinic guard; staff-account creation is admin-only (server action + role toggle hidden in `add-user.tsx`) (C1); patients can no longer message deactivated clinicians (picker filters + `sendMessage` rejects) and `getCareTeam` excludes deactivated staff (B1/B2); test-user password scrubbed from this doc.
 
-**⏳ TO SHIP:**
-1. `psql "$DIRECT_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/0036_patient_deactivation_and_audit_scope.sql` (bastion tunnel, owner role).
-2. `cd infra && npx cdk deploy -c stage=staging -c withService=true -c domain=staging.mygrandhealth.com -c hostedZone=staging.mygrandhealth.com` (new Cognito IAM actions).
-3. `git push` + deploy workflow.
-4. Smoke test: non-admin can't see Audit-log nav / add staff / delete patient; deactivate a test patient → login blocked (Cognito disabled), record still visible to clinician, reactivate works; clinician without MFA hitting a server action gets bounced to /mfa-setup.
+**✅ SHIPPED (all four steps done 2026-07-14):** migration applied + policies verified via pg_policies; cdk deployed; pushed + workflow deployed; image `:2d86e769…` confirmed running.
+
+**⏳ NEXT SESSION — browser smoke test still to do:** non-admin (nurse@) can't see Audit-log nav / staff toggle in Add patient / danger zone on a patient page; admin deactivates a test patient → "Deactivated" badge on roster, their login fails outright (Cognito disabled), record still opens for clinician, reactivate restores login; clinician without TOTP hitting any server action gets bounced to /mfa-setup.
 
 **⏳ Still open from the review (not code, or deferred):** rotate RDS password + Cloudinary secret + GitHub token and move repo out of iCloud (A5); CSP, rate limiting, idle timeout (A8); wearable token encryption at app layer; renumber duplicate migrations; patient-facing data export (B3); admin review for provider credentials (C2).
 
