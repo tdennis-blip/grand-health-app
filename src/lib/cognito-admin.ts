@@ -11,6 +11,7 @@ import {
   AdminGetUserCommand,
   UsernameExistsException,
   UserNotFoundException,
+  UnsupportedUserStateException,
 } from "@aws-sdk/client-cognito-identity-provider";
 
 const REGION = process.env.NEXT_PUBLIC_AWS_REGION || "us-east-1";
@@ -26,6 +27,16 @@ export class EmailInUseError extends Error {
   constructor() {
     super("An account with that email already exists.");
     this.name = "EmailInUseError";
+  }
+}
+
+// Thrown when a resend-invite is attempted on a user who has already completed
+// first sign-in (i.e. not in FORCE_CHANGE_PASSWORD). Such users should use the
+// self-service "Forgot password" flow instead — there's no invite to resend.
+export class InviteAlreadyAcceptedError extends Error {
+  constructor() {
+    super("This patient has already set up their account. Ask them to use “Forgot password” on the login screen instead.");
+    this.name = "InviteAlreadyAcceptedError";
   }
 }
 
@@ -76,6 +87,30 @@ export async function userHasTotpMfa(username: string): Promise<boolean> {
     if (err instanceof UserNotFoundException) return false;
     // Unknown error → treat as "no MFA" so we don't accidentally bypass the gate.
     return false;
+  }
+}
+
+// Re-sends the account invitation with a FRESH temporary password, resetting
+// the temp-password validity clock. This is the fix for "invited patient never
+// set up their account and the temp password expired": AdminCreateUser with
+// MessageAction RESEND re-issues the invite email without creating a new user.
+// Only works while the user is still in FORCE_CHANGE_PASSWORD state; Cognito
+// throws UnsupportedUserStateException once they've set a permanent password.
+// Requires cognito-idp:AdminCreateUser on the task role (already granted).
+export async function resendCognitoInvite(email: string): Promise<void> {
+  try {
+    await getClient().send(
+      new AdminCreateUserCommand({
+        UserPoolId: USER_POOL_ID,
+        Username: email,
+        MessageAction: "RESEND",
+        DesiredDeliveryMediums: ["EMAIL"],
+      })
+    );
+  } catch (err) {
+    if (err instanceof UnsupportedUserStateException) throw new InviteAlreadyAcceptedError();
+    if (err instanceof UserNotFoundException) throw new Error("No login exists for that email.");
+    throw err;
   }
 }
 

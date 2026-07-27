@@ -7,7 +7,7 @@ import { serviceRoleSql } from "@/lib/db/connection";
 import { recordAudit } from "@/lib/audit";
 import { isAdminClinician } from "@/lib/care-team";
 import { seedDefaultPillars } from "@/lib/default-pillars";
-import { createCognitoUser, deleteCognitoUser, EmailInUseError } from "@/lib/cognito-admin";
+import { createCognitoUser, deleteCognitoUser, resendCognitoInvite, EmailInUseError, InviteAlreadyAcceptedError } from "@/lib/cognito-admin";
 
 const createUserSchema = z.object({
   firstName: z.string().min(1).max(100),
@@ -159,6 +159,50 @@ export async function setPatientActive(
   }).catch(() => undefined);
 
   revalidatePath("/clinician/dashboard");
+  revalidatePath(`/clinician/patient/${patientId}`);
+  return { ok: true };
+}
+
+// Re-sends the Cognito invite (fresh temp password + reset validity clock) for
+// a patient who was invited but never completed first sign-in — the common
+// "temp password expired before they set one up" case. Admin-only, audited.
+// Fails cleanly if the patient has already accepted their invite (they should
+// use self-service "Forgot password" instead).
+export async function resendPatientInvite(
+  input: { patientId: string }
+): Promise<{ ok: boolean; error?: string }> {
+  const parsed = z.object({ patientId: z.string().uuid() }).safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Invalid patient." };
+  const { patientId } = parsed.data;
+
+  const user = await requireClinician();
+  if (!(await isAdminClinician(user.id))) {
+    return { ok: false, error: "Only administrators can resend a patient invite." };
+  }
+
+  const [target] = await serviceRoleSql<{ email: string; role: string; clinic_id: string }[]>`
+    SELECT email, role, clinic_id FROM public.profiles WHERE id = ${patientId} LIMIT 1
+  `;
+  if (!target) return { ok: false, error: "Patient not found." };
+  if (target.clinic_id !== user.clinicId) return { ok: false, error: "Not in your clinic." };
+  if (target.role !== "patient") return { ok: false, error: "Only patient invites can be resent here." };
+
+  try {
+    await resendCognitoInvite(target.email);
+  } catch (err) {
+    if (err instanceof InviteAlreadyAcceptedError) return { ok: false, error: err.message };
+    console.error("resendPatientInvite failed", err);
+    return { ok: false, error: "Couldn't resend the invite. Please try again." };
+  }
+
+  await recordAudit({
+    action: "update",
+    entityType: "patient_invite_resend",
+    entityId: patientId,
+    patientId,
+    meta: { email: target.email },
+  }).catch(() => undefined);
+
   revalidatePath(`/clinician/patient/${patientId}`);
   return { ok: true };
 }
