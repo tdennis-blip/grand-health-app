@@ -20,9 +20,13 @@ export default async function SessionEditPage({ params }: { params: Promise<{ id
 
   // Zones follow the session's owner: a patient-specific session uses that
   // patient's zones; a generic template uses the clinic's generic zones.
-  const zones = await withAuth(user, (sql) =>
-    sql`SELECT id, zone_key, name, short_name, low_bpm, high_bpm FROM hr_zones WHERE patient_id IS NOT DISTINCT FROM ${session.patient_id} ORDER BY sort_order ASC`
-  );
+  const zones = session.patient_id
+    ? await withAuth(user, (sql) =>
+        sql`SELECT id, zone_key, name, short_name, low_bpm, high_bpm FROM hr_zones WHERE patient_id = ${session.patient_id} ORDER BY sort_order ASC`
+      )
+    : await withAuth(user, (sql) =>
+        sql`SELECT id, zone_key, name, short_name, low_bpm, high_bpm FROM hr_zones WHERE patient_id IS NULL ORDER BY sort_order ASC`
+      );
 
   let attached: any[] = [];
   let exerciseLibrary: any[] = [];

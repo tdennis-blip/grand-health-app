@@ -17,9 +17,13 @@ export default async function ProgramEditPage({ params }: { params: Promise<{ id
     withAuth(user, (sql) => sql`SELECT id, day, session_id, sort_order FROM program_days WHERE program_id = ${id} AND session_id IS NOT NULL ORDER BY sort_order ASC`),
     // Session picker: generic templates always, plus this patient's own
     // sessions when the program is patient-specific.
-    withAuth(user, (sql) =>
-      sql`SELECT id, kind, name, est_minutes, duration_min, rounds, work_min FROM session_library WHERE patient_id IS NULL OR patient_id IS NOT DISTINCT FROM ${program.patient_id} ORDER BY (patient_id IS NOT NULL) DESC, kind ASC, name ASC`
-    ),
+    program.patient_id
+      ? withAuth(user, (sql) =>
+          sql`SELECT id, kind, name, est_minutes, duration_min, rounds, work_min FROM session_library WHERE patient_id IS NULL OR patient_id = ${program.patient_id} ORDER BY (patient_id IS NOT NULL) DESC, kind ASC, name ASC`
+        )
+      : withAuth(user, (sql) =>
+          sql`SELECT id, kind, name, est_minutes, duration_min, rounds, work_min FROM session_library WHERE patient_id IS NULL ORDER BY kind ASC, name ASC`
+        ),
   ]);
 
   const dayMap: Record<string, { rowId: string; sessionId: string }[]> = {
