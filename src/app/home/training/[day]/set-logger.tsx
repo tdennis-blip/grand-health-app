@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { Check, Play, Pause, RotateCcw } from "lucide-react";
 import { logSet } from "./log-actions";
 
-type SetRow = { id: string; setNumber: number; reps: number; weight: number; durationSeconds: number | null };
+type SetRow = { id: string; setNumber: number; reps: number; repsMin: number; repsMax: number; weight: number; durationSeconds: number | null };
 type SetLog = {
   setId: string;
   side: string;
@@ -48,8 +48,12 @@ export function SetLogger({
     sets.forEach((s) => {
       sides.forEach((side) => {
         const log = logs[keyOf(s.id, side)];
+        // For a true range (min≠max) leave the actual-reps field blank so the
+        // client types what they actually did; a fixed target prefills.
+        const isRange = s.repsMin !== s.repsMax;
+        const repsSeed = log?.actualReps != null ? String(log.actualReps) : isRange ? "" : String(s.repsMax);
         init[keyOf(s.id, side)] = {
-          reps: String(log?.actualReps ?? s.reps),
+          reps: repsSeed,
           weight: String(log?.actualWeight ?? s.weight),
           seconds: String(log?.actualSeconds ?? s.durationSeconds ?? ""),
           done: log?.done ?? false,
@@ -105,7 +109,7 @@ export function SetLogger({
                     </span>
                   )}
                   <span className="text-[11px] font-normal text-slate-400">
-                    target {s.reps}×{s.weight}{timed ? ` · ${s.durationSeconds}s` : ""}
+                    target {s.repsMin !== s.repsMax ? `${s.repsMin}–${s.repsMax}` : s.repsMax}×{s.weight}{timed ? ` · ${s.durationSeconds}s` : ""}
                   </span>
                 </div>
                 <button

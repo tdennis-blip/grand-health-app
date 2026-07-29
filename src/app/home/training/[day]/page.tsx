@@ -7,6 +7,7 @@ import {
   getSessionDetail,
   getSetLogsForSession,
   getCardioLogForSession,
+  getWorkoutFeedback,
   getPatientActivitiesForDate,
   DAY_KEYS,
   DAY_LABELS,
@@ -15,6 +16,7 @@ import {
 import { SetLogger } from "./set-logger";
 import { CardioLogger } from "./cardio-logger";
 import { ActivityLogger } from "./add-activity";
+import { WorkoutFeedback } from "./workout-feedback";
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
@@ -139,6 +141,7 @@ export default async function PatientSessionDetail({
     session.kind === "zone2" || session.kind === "vo2max"
       ? await getCardioLogForSession(session.id, logDate)
       : null;
+  const feedback = await getWorkoutFeedback(session.id, logDate);
   const activities = await getPatientActivitiesForDate(logDate);
 
   const Icon = KIND_ICON[session.kind];
@@ -296,6 +299,13 @@ export default async function PatientSessionDetail({
                   </div>
                 )}
 
+                {ex.sessionCoachNote && (
+                  <div className="text-[12px] text-teal-800 bg-teal-50 border border-teal-100 rounded-lg px-2.5 py-2 mb-2 leading-snug">
+                    <span className="text-[10px] uppercase tracking-wide text-teal-600 font-semibold block mb-0.5">Coaching note</span>
+                    {ex.sessionCoachNote}
+                  </div>
+                )}
+
                 {ex.sets.length > 0 && (
                   <SetLogger
                     kind={session.kind === "mobility" ? "mobility" : "strength"}
@@ -312,6 +322,15 @@ export default async function PatientSessionDetail({
           })}
         </section>
       )}
+
+      {/* End-of-workout feedback: effort + comments/questions to the trainer */}
+      <WorkoutFeedback
+        sessionId={session.id}
+        sessionName={session.name}
+        day={day}
+        logDate={logDate}
+        initial={feedback}
+      />
 
       <ActivityLogger day={day} logDate={logDate} activities={activities} />
     </main>

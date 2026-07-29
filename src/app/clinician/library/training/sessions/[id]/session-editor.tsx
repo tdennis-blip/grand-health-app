@@ -11,6 +11,7 @@ import {
   addSet,
   removeSet,
   updateSet,
+  updateSessionExerciseNote,
 } from "../actions";
 
 type Kind = "strength" | "zone2" | "vo2max" | "mobility";
@@ -24,7 +25,7 @@ type Zone = {
   highBpm: number;
 };
 
-type AttachedSet = { id: string; setNumber: number; reps: number; weight: number; durationSeconds: number | null };
+type AttachedSet = { id: string; setNumber: number; repsMin: number; repsMax: number; weight: number; durationSeconds: number | null };
 type Attached = {
   id: string;
   sortOrder: number;
@@ -32,6 +33,7 @@ type Attached = {
   exerciseName: string;
   primaryArea: string | null;
   videoTitle: string | null;
+  coachNote: string | null;
   sets: AttachedSet[];
 };
 
@@ -315,8 +317,8 @@ function ExercisesSection({
 }) {
   const [pending, startTransition] = useTransition();
   const labels = kind === "mobility"
-    ? { round: "Round", reps: "Hold (sec)", weight: "Reps / sides", add: "Add move", title: "Mobility moves in this flow" }
-    : { round: "Set",   reps: "Reps",       weight: "Weight (lb)", add: "Add exercise", title: "Exercises in this session" };
+    ? { round: "Round", reps: "Hold range (sec)", weight: "Reps / sides", add: "Add move", title: "Mobility moves in this flow" }
+    : { round: "Set",   reps: "Rep range",        weight: "Weight (lb)", add: "Add exercise", title: "Exercises in this session" };
 
   const noneInLibrary = exerciseLibrary.length === 0;
 
@@ -443,11 +445,18 @@ function AttachedExerciseRow({
         </div>
       )}
 
+      <div className="ml-8 mb-2">
+        <CoachNoteField
+          initial={attached.coachNote}
+          onSave={(note) => startTransition(() => updateSessionExerciseNote({ id: attached.id, sessionId, coachNote: note }))}
+        />
+      </div>
+
       <div className="ml-8 space-y-1.5">
         <div className="grid grid-cols-12 gap-2 text-[10px] uppercase tracking-wide text-slate-500 font-semibold">
           <div className="col-span-2">{labels.round}</div>
-          <div className="col-span-3">{labels.reps}</div>
-          <div className="col-span-3">{labels.weight}</div>
+          <div className="col-span-4">{labels.reps}</div>
+          <div className="col-span-2">{labels.weight}</div>
           <div className="col-span-2">Time (s)</div>
           <div className="col-span-2"></div>
         </div>
@@ -466,6 +475,26 @@ function AttachedExerciseRow({
   );
 }
 
+// Per-exercise coaching note, saved on blur. Shown to the patient on their
+// session view for this specific exercise.
+function CoachNoteField({ initial, onSave }: { initial: string | null; onSave: (note: string | null) => void }) {
+  const [note, setNote] = useState(initial ?? "");
+  const dirty = (note.trim() || null) !== (initial ?? null);
+  return (
+    <label className="block">
+      <div className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold mb-1">Coaching note (shown to client)</div>
+      <textarea
+        rows={2}
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        onBlur={() => { if (dirty) onSave(note.trim() || null); }}
+        placeholder="Tempo, cues, target feel, form reminders…"
+        className="w-full text-[13px] border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:border-teal-500"
+      />
+    </label>
+  );
+}
+
 function SetRow({
   set,
   sessionId,
@@ -475,30 +504,43 @@ function SetRow({
   sessionId: string;
   canRemove: boolean;
 }) {
-  const [reps, setReps] = useState(set.reps);
+  const [repsMin, setRepsMin] = useState(set.repsMin);
+  const [repsMax, setRepsMax] = useState(set.repsMax);
   const [weight, setWeight] = useState(set.weight);
   const [durationSeconds, setDurationSeconds] = useState<number | null>(set.durationSeconds);
   const [pending, startTransition] = useTransition();
 
-  const dirty = reps !== set.reps || weight !== set.weight || durationSeconds !== set.durationSeconds;
-  const save = () => dirty && startTransition(() => updateSet({ id: set.id, sessionId, reps, weight, durationSeconds }));
+  const dirty = repsMin !== set.repsMin || repsMax !== set.repsMax || weight !== set.weight || durationSeconds !== set.durationSeconds;
+  const save = () => dirty && startTransition(() => updateSet({ id: set.id, sessionId, repsMin, repsMax, weight, durationSeconds }));
 
   return (
     <div className="grid grid-cols-12 gap-2 items-center">
       <div className="col-span-2 text-sm text-slate-700 font-medium">#{set.setNumber}</div>
-      <input
-        type="number"
-        value={reps}
-        onChange={(e) => setReps(Number(e.target.value) || 0)}
-        onBlur={save}
-        className="col-span-3 text-sm text-slate-800 border border-slate-200 rounded-lg p-1.5 focus:outline-none focus:border-teal-500 bg-white tabular-nums"
-      />
+      <div className="col-span-4 flex items-center gap-1">
+        <input
+          type="number"
+          value={repsMin}
+          onChange={(e) => setRepsMin(Number(e.target.value) || 0)}
+          onBlur={save}
+          aria-label="Min reps"
+          className="w-full text-sm text-slate-800 border border-slate-200 rounded-lg p-1.5 focus:outline-none focus:border-teal-500 bg-white tabular-nums text-center"
+        />
+        <span className="text-slate-400 text-xs">–</span>
+        <input
+          type="number"
+          value={repsMax}
+          onChange={(e) => setRepsMax(Number(e.target.value) || 0)}
+          onBlur={save}
+          aria-label="Max reps"
+          className="w-full text-sm text-slate-800 border border-slate-200 rounded-lg p-1.5 focus:outline-none focus:border-teal-500 bg-white tabular-nums text-center"
+        />
+      </div>
       <input
         type="number"
         value={weight}
         onChange={(e) => setWeight(Number(e.target.value) || 0)}
         onBlur={save}
-        className="col-span-3 text-sm text-slate-800 border border-slate-200 rounded-lg p-1.5 focus:outline-none focus:border-teal-500 bg-white tabular-nums"
+        className="col-span-2 text-sm text-slate-800 border border-slate-200 rounded-lg p-1.5 focus:outline-none focus:border-teal-500 bg-white tabular-nums"
       />
       <input
         type="number"

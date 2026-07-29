@@ -12,23 +12,32 @@ type LogRow = {
   done: boolean;
   set_number: number;
   target_reps: number;
+  target_reps_min: number | null;
+  target_reps_max: number | null;
   target_weight: number;
   exercise_name: string;
   session_name: string;
+};
+
+type FeedbackRow = {
+  log_date: string;
+  session_name: string;
+  rpe: number | null;
+  comment: string | null;
 };
 
 export default async function PatientWorkoutsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await requireClinician();
 
-  const [[patient], rows, cardioWeeks, oneRmSeries] = await Promise.all([
+  const [[patient], rows, feedbackRows, cardioWeeks, oneRmSeries] = await Promise.all([
     withAuth(user, (sql) =>
       sql`SELECT first_name, last_name FROM profiles WHERE id = ${id} LIMIT 1`
     ),
     withAuth(user, (sql) =>
       sql`
         SELECT esl.log_date, esl.actual_reps, esl.actual_weight, esl.done,
-               ss.set_number, ss.reps AS target_reps, ss.weight AS target_weight,
+               ss.set_number, ss.reps AS target_reps, ss.reps_min AS target_reps_min, ss.reps_max AS target_reps_max, ss.weight AS target_weight,
                el.name AS exercise_name, sl.name AS session_name
         FROM exercise_set_logs esl
         JOIN session_sets ss ON ss.id = esl.set_id
@@ -39,6 +48,16 @@ export default async function PatientWorkoutsPage({ params }: { params: Promise<
         ORDER BY esl.log_date DESC, sl.name ASC, el.name ASC, ss.set_number ASC
         LIMIT 300
       ` as Promise<LogRow[]>
+    ),
+    withAuth(user, (sql) =>
+      sql`
+        SELECT sfl.log_date, sl.name AS session_name, sfl.rpe, sfl.comment
+        FROM session_feedback_logs sfl
+        JOIN session_library sl ON sl.id = sfl.session_id
+        WHERE sfl.patient_id = ${id}
+        ORDER BY sfl.log_date DESC
+        LIMIT 200
+      ` as Promise<FeedbackRow[]>
     ),
     getWeeklyCardioMinutes(user, id, 12),
     getExercise1RMSeries(user, id),
@@ -53,6 +72,14 @@ export default async function PatientWorkoutsPage({ params }: { params: Promise<
     const m = byDate.get(d)!;
     if (!m.has(key)) m.set(key, []);
     m.get(key)!.push(r);
+  });
+
+  // Feedback keyed by date -> list of {session, rpe, comment}
+  const feedbackByDate = new Map<string, FeedbackRow[]>();
+  feedbackRows.forEach((f) => {
+    const d = String(f.log_date).slice(0, 10);
+    if (!feedbackByDate.has(d)) feedbackByDate.set(d, []);
+    feedbackByDate.get(d)!.push(f);
   });
 
   const patientName = patient ? `${patient.first_name ?? ""} ${patient.last_name ?? ""}`.trim() : "Patient";
@@ -84,6 +111,18 @@ export default async function PatientWorkoutsPage({ params }: { params: Promise<
               <div className="text-sm font-semibold text-slate-900 mb-3">
                 {new Date(`${date}T00:00:00`).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
               </div>
+
+              {(feedbackByDate.get(date) ?? []).map((f, i) => (
+                (f.rpe != null || f.comment) ? (
+                  <div key={i} className="mb-3 rounded-xl bg-teal-50 border border-teal-100 p-3">
+                    <div className="text-[10px] uppercase tracking-wide text-teal-700 font-semibold mb-1">
+                      Feedback · {f.session_name}{f.rpe != null ? ` · RPE ${f.rpe}/10` : ""}
+                    </div>
+                    {f.comment && <div className="text-[13px] text-slate-700 leading-snug">{f.comment}</div>}
+                  </div>
+                ) : null
+              ))}
+
               <div className="space-y-4">
                 {[...exercises.entries()].map(([key, sets]) => (
                   <div key={key}>
@@ -102,7 +141,11 @@ export default async function PatientWorkoutsPage({ params }: { params: Promise<
                         return (
                           <div key={s.set_number} className="grid grid-cols-12 gap-2 text-sm py-1 border-t border-slate-100 items-center">
                             <div className="col-span-2 font-medium text-slate-700">#{s.set_number}</div>
-                            <div className="col-span-4 text-center tabular-nums text-slate-400">{s.target_reps}×{s.target_weight}</div>
+                            <div className="col-span-4 text-center tabular-nums text-slate-400">
+                              {s.target_reps_min != null && s.target_reps_max != null && s.target_reps_min !== s.target_reps_max
+                                ? `${s.target_reps_min}–${s.target_reps_max}`
+                                : (s.target_reps_max ?? s.target_reps)}×{s.target_weight}
+                            </div>
                             <div className="col-span-4 text-center tabular-nums text-slate-900 font-semibold">{actual}</div>
                             <div className="col-span-2 flex justify-center">
                               {s.done ? <Check size={15} className="text-teal-600" /> : <span className="text-slate-300">–</span>}

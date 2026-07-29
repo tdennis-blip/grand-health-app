@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requirePatient } from "@/lib/auth/server";
-import { withAuth } from "@/lib/db/connection";
+import { withAuth, serviceRoleSql } from "@/lib/db/connection";
 import { recordAudit } from "@/lib/audit";
 
 const logSetSchema = z.object({
@@ -87,6 +87,91 @@ export async function logCardioSession(input: z.infer<typeof logCardioSchema>) {
   });
 
   revalidatePath(`/home/training/${parsed.day}`);
+}
+
+// ── End-of-workout feedback: RPE (1–10) + optional comment/question ─────────
+const feedbackSchema = z.object({
+  sessionId: z.string().uuid(),
+  sessionName: z.string().max(200).optional(),
+  day: z.string().min(1).max(8),
+  logDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  rpe: z.number().int().min(1).max(10).nullable(),
+  comment: z.string().trim().max(4000).nullable(),
+});
+
+// Resolve the patient's trainer to message: their primary clinician if set,
+// else the first active clinician on their care team. Uses the service role
+// so the lookup isn't blocked by patient-scoped RLS.
+async function resolveTrainer(patientId: string): Promise<string | null> {
+  const [prof] = await serviceRoleSql<{ primary_clinician_id: string | null }[]>`
+    SELECT pp.primary_clinician_id
+    FROM public.patient_profiles pp
+    LEFT JOIN public.clinician_profiles cp ON cp.profile_id = pp.primary_clinician_id
+    WHERE pp.profile_id = ${patientId}
+      AND cp.deactivated_at IS NULL
+    LIMIT 1
+  `;
+  if (prof?.primary_clinician_id) return prof.primary_clinician_id;
+
+  const [ct] = await serviceRoleSql<{ clinician_id: string }[]>`
+    SELECT ct.clinician_id
+    FROM public.patient_care_team ct
+    JOIN public.clinician_profiles cp ON cp.profile_id = ct.clinician_id
+    WHERE ct.patient_id = ${patientId}
+      AND cp.deactivated_at IS NULL
+    ORDER BY ct.created_at ASC NULLS LAST
+    LIMIT 1
+  `;
+  return ct?.clinician_id ?? null;
+}
+
+export async function saveWorkoutFeedback(input: z.infer<typeof feedbackSchema>) {
+  const parsed = feedbackSchema.parse(input);
+  const user = await requirePatient();
+
+  await withAuth(user, (sql) =>
+    sql`
+      INSERT INTO session_feedback_logs
+        (clinic_id, patient_id, session_id, log_date, rpe, comment)
+      VALUES
+        (${user.clinicId}, ${user.id}, ${parsed.sessionId}, ${parsed.logDate}, ${parsed.rpe}, ${parsed.comment})
+      ON CONFLICT (patient_id, session_id, log_date) DO UPDATE SET
+        rpe = EXCLUDED.rpe,
+        comment = EXCLUDED.comment,
+        updated_at = now()
+    `
+  );
+
+  // If the client left a comment/question, forward it to their trainer as an
+  // in-app message so it lands in the clinician inbox.
+  let messaged = false;
+  if (parsed.comment && parsed.comment.length > 0) {
+    const trainerId = await resolveTrainer(user.id);
+    if (trainerId) {
+      const label = parsed.sessionName ? `“${parsed.sessionName}”` : "today’s workout";
+      const rpeLine = parsed.rpe != null ? `RPE ${parsed.rpe}/10. ` : "";
+      const body = `[Workout feedback · ${parsed.logDate}] ${label}\n${rpeLine}${parsed.comment}`;
+      await serviceRoleSql`
+        INSERT INTO public.messages (clinic_id, patient_id, sender_id, sender_role, recipient_id, body)
+        VALUES (${user.clinicId}, ${user.id}, ${user.id}, 'patient', ${trainerId}, ${body})
+      `;
+      messaged = true;
+      revalidatePath(`/clinician/messages/${user.id}`);
+      revalidatePath("/clinician/messages");
+      revalidatePath("/home/chat");
+    }
+  }
+
+  await recordAudit({
+    action: "create",
+    entityType: "session_feedback_log",
+    entityId: parsed.sessionId,
+    patientId: user.id,
+    meta: { rpe: parsed.rpe, has_comment: !!parsed.comment, messaged, date: parsed.logDate },
+  });
+
+  revalidatePath(`/home/training/${parsed.day}`);
+  return { messaged };
 }
 
 // ── Patient ad-hoc activity (workouts not in the prescribed program) ────────

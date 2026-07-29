@@ -27,7 +27,7 @@ export default async function SessionEditPage({ params }: { params: Promise<{ id
   if (kind === "strength" || kind === "mobility") {
     const [seRows, libRows, setRows] = await Promise.all([
       withAuth(user, (sql) =>
-        sql`SELECT se.id, se.sort_order, se.exercise_id, e.id AS ex_id, e.name AS ex_name, e.primary_area, e.video_title FROM session_exercises se JOIN exercise_library e ON e.id = se.exercise_id WHERE se.session_id = ${id} ORDER BY se.sort_order ASC`
+        sql`SELECT se.id, se.sort_order, se.exercise_id, se.coach_note, e.id AS ex_id, e.name AS ex_name, e.primary_area, e.video_title FROM session_exercises se JOIN exercise_library e ON e.id = se.exercise_id WHERE se.session_id = ${id} ORDER BY se.sort_order ASC`
       ),
       withAuth(user, (sql) =>
         // Strength and mobility sessions can both pull from either library, so a
@@ -36,7 +36,7 @@ export default async function SessionEditPage({ params }: { params: Promise<{ id
         sql`SELECT id, name, primary_area, kind FROM exercise_library WHERE kind IN ('strength', 'mobility') ORDER BY (kind = ${kind}) DESC, name ASC`
       ),
       withAuth(user, (sql) =>
-        sql`SELECT ss.id, ss.session_exercise_id, ss.set_number, ss.reps, ss.weight, ss.duration_seconds FROM session_sets ss JOIN session_exercises se ON se.id = ss.session_exercise_id WHERE se.session_id = ${id} ORDER BY ss.set_number ASC`
+        sql`SELECT ss.id, ss.session_exercise_id, ss.set_number, ss.reps, ss.reps_min, ss.reps_max, ss.weight, ss.duration_seconds FROM session_sets ss JOIN session_exercises se ON se.id = ss.session_exercise_id WHERE se.session_id = ${id} ORDER BY ss.set_number ASC`
       ),
     ]);
     const setsByEx: Record<string, any[]> = {};
@@ -48,7 +48,15 @@ export default async function SessionEditPage({ params }: { params: Promise<{ id
       exerciseName: se.ex_name ?? "(unknown)",
       primaryArea: se.primary_area ?? null,
       videoTitle: se.video_title ?? null,
-      sets: (setsByEx[se.id] ?? []).map((s: any) => ({ id: s.id, setNumber: s.set_number, reps: s.reps, weight: s.weight, durationSeconds: s.duration_seconds ?? null })),
+      coachNote: se.coach_note ?? null,
+      sets: (setsByEx[se.id] ?? []).map((s: any) => ({
+        id: s.id,
+        setNumber: s.set_number,
+        repsMin: s.reps_min ?? s.reps ?? 0,
+        repsMax: s.reps_max ?? s.reps ?? 0,
+        weight: s.weight,
+        durationSeconds: s.duration_seconds ?? null,
+      })),
     }));
     exerciseLibrary = libRows.map((e: any) => ({ id: e.id, name: e.name, primaryArea: e.primary_area, kind: e.kind }));
   }

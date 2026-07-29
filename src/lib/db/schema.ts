@@ -470,6 +470,7 @@ export const sessionExercises = pgTable(
       .notNull()
       .references(() => exerciseLibrary.id, { onDelete: "restrict" }),
     sortOrder: integer("sort_order").default(0).notNull(),
+    coachNote: text("coach_note"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => ({
@@ -485,7 +486,9 @@ export const sessionSets = pgTable(
       .notNull()
       .references(() => sessionExercises.id, { onDelete: "cascade" }),
     setNumber: integer("set_number").notNull(),
-    reps: integer("reps").default(0).notNull(),
+    reps: integer("reps").default(0).notNull(), // legacy single value; kept in sync with reps_max
+    repsMin: integer("reps_min"),
+    repsMax: integer("reps_max"),
     weight: integer("weight").default(0).notNull(),
     durationSeconds: integer("duration_seconds"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -538,6 +541,27 @@ export const cardioSessionLogs = pgTable(
     patientDateIdx: index("cardio_session_logs_patient_date_idx").on(t.patientId, t.logDate),
     sessionIdx: index("cardio_session_logs_session_idx").on(t.sessionId),
     uniqPatientSessionDate: unique("cardio_session_logs_patient_session_date_key").on(t.patientId, t.sessionId, t.logDate),
+  })
+);
+
+// Post-workout feedback per (patient, session, date): RPE + optional comment.
+export const sessionFeedbackLogs = pgTable(
+  "session_feedback_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clinicId: uuid("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
+    patientId: uuid("patient_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+    sessionId: uuid("session_id").notNull().references(() => sessionLibrary.id, { onDelete: "cascade" }),
+    logDate: date("log_date").notNull(),
+    rpe: integer("rpe"), // 1–10
+    comment: text("comment"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    patientDateIdx: index("session_feedback_logs_patient_date_idx").on(t.patientId, t.logDate),
+    sessionIdx: index("session_feedback_logs_session_idx").on(t.sessionId),
+    uniqPatientSessionDate: unique("session_feedback_logs_patient_session_date_key").on(t.patientId, t.sessionId, t.logDate),
   })
 );
 

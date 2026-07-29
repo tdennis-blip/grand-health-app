@@ -108,7 +108,7 @@ export async function addSessionExercise(args: { sessionId: string; exerciseId: 
   if (!inserted) throw new Error("Insert failed");
 
   await withAuth(user, (sql) =>
-    sql`INSERT INTO session_sets (session_exercise_id, set_number, reps, weight) VALUES (${inserted.id}, 1, 10, 0)`
+    sql`INSERT INTO session_sets (session_exercise_id, set_number, reps, reps_min, reps_max, weight) VALUES (${inserted.id}, 1, 10, 10, 12, 0)`
   );
 
   await recordAudit({ action: "create", entityType: "session_exercise", entityId: inserted.id, meta: { session_id: args.sessionId, exercise_id: args.exerciseId } });
@@ -152,11 +152,13 @@ export async function addSet(args: { sessionExerciseId: string; sessionId: strin
   const user = await requireClinician();
 
   const [last] = await withAuth(user, (sql) =>
-    sql`SELECT set_number, reps, weight, duration_seconds FROM session_sets WHERE session_exercise_id = ${args.sessionExerciseId} ORDER BY set_number DESC LIMIT 1`
+    sql`SELECT set_number, reps, reps_min, reps_max, weight, duration_seconds FROM session_sets WHERE session_exercise_id = ${args.sessionExerciseId} ORDER BY set_number DESC LIMIT 1`
   );
   const nextNumber = (last?.set_number ?? 0) + 1;
+  const repsMin = last?.reps_min ?? last?.reps ?? 10;
+  const repsMax = last?.reps_max ?? last?.reps ?? 12;
   await withAuth(user, (sql) =>
-    sql`INSERT INTO session_sets (session_exercise_id, set_number, reps, weight, duration_seconds) VALUES (${args.sessionExerciseId}, ${nextNumber}, ${last?.reps ?? 10}, ${last?.weight ?? 0}, ${last?.duration_seconds ?? null})`
+    sql`INSERT INTO session_sets (session_exercise_id, set_number, reps, reps_min, reps_max, weight, duration_seconds) VALUES (${args.sessionExerciseId}, ${nextNumber}, ${repsMax}, ${repsMin}, ${repsMax}, ${last?.weight ?? 0}, ${last?.duration_seconds ?? null})`
   );
   revalidateSession(args.sessionId);
 }
@@ -167,8 +169,20 @@ export async function removeSet(args: { id: string; sessionId: string }) {
   revalidateSession(args.sessionId);
 }
 
-export async function updateSet(args: { id: string; sessionId: string; reps: number; weight: number; durationSeconds?: number | null }) {
+export async function updateSet(args: { id: string; sessionId: string; repsMin: number; repsMax: number; weight: number; durationSeconds?: number | null }) {
   const user = await requireClinician();
-  await withAuth(user, (sql) => sql`UPDATE session_sets SET reps = ${args.reps}, weight = ${args.weight}, duration_seconds = ${args.durationSeconds ?? null} WHERE id = ${args.id}`);
+  // Normalize the range so min <= max; keep the legacy `reps` column in sync
+  // with the top of the range for old readers/analytics.
+  const lo = Math.max(0, Math.min(args.repsMin, args.repsMax));
+  const hi = Math.max(0, Math.max(args.repsMin, args.repsMax));
+  await withAuth(user, (sql) => sql`UPDATE session_sets SET reps = ${hi}, reps_min = ${lo}, reps_max = ${hi}, weight = ${args.weight}, duration_seconds = ${args.durationSeconds ?? null} WHERE id = ${args.id}`);
+  revalidateSession(args.sessionId);
+}
+
+// Per-session-exercise coaching note, editable in the session builder.
+export async function updateSessionExerciseNote(args: { id: string; sessionId: string; coachNote: string | null }) {
+  const user = await requireClinician();
+  const note = args.coachNote && args.coachNote.trim() !== "" ? args.coachNote.trim().slice(0, 2000) : null;
+  await withAuth(user, (sql) => sql`UPDATE session_exercises SET coach_note = ${note} WHERE id = ${args.id}`);
   revalidateSession(args.sessionId);
 }

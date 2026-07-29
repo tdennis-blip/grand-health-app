@@ -128,12 +128,13 @@ export type SessionDetail = {
     sortOrder: number;
     name: string;
     primaryArea: string | null;
-    coachNote: string | null;
+    coachNote: string | null;       // exercise-library default note
+    sessionCoachNote: string | null; // per-session note set in the builder
     videoTitle: string | null;
     videoLength: string | null;
     videoUrl: string | null;
     perSide: boolean;
-    sets: Array<{ id: string; setNumber: number; reps: number; weight: number; durationSeconds: number | null }>;
+    sets: Array<{ id: string; setNumber: number; reps: number; repsMin: number; repsMax: number; weight: number; durationSeconds: number | null }>;
   }>;
 };
 
@@ -163,7 +164,7 @@ export async function getSessionDetail(sessionId: string): Promise<SessionDetail
 
   const exercises = await withAuth(user, (sql) =>
     sql`
-      SELECT se.id, se.sort_order, se.exercise_id,
+      SELECT se.id, se.sort_order, se.exercise_id, se.coach_note AS session_coach_note,
              e.name AS exercise_name, e.primary_area, e.coach_note AS exercise_coach_note,
              e.video_title, e.video_length, e.video_url, e.per_side
       FROM session_exercises se
@@ -176,7 +177,7 @@ export async function getSessionDetail(sessionId: string): Promise<SessionDetail
   const seIds = exercises.map((e: any) => e.id as string);
   const sets = seIds.length > 0
     ? await withAuth(user, (sql) =>
-        sql`SELECT id, session_exercise_id, set_number, reps, weight, duration_seconds FROM session_sets WHERE session_exercise_id = ANY(${seIds}) ORDER BY set_number ASC`
+        sql`SELECT id, session_exercise_id, set_number, reps, reps_min, reps_max, weight, duration_seconds FROM session_sets WHERE session_exercise_id = ANY(${seIds}) ORDER BY set_number ASC`
       )
     : [];
 
@@ -212,12 +213,14 @@ export async function getSessionDetail(sessionId: string): Promise<SessionDetail
       name: se.exercise_name ?? "(unknown)",
       primaryArea: se.primary_area ?? null,
       coachNote: se.exercise_coach_note ?? null,
+      sessionCoachNote: se.session_coach_note ?? null,
       videoTitle: se.video_title ?? null,
       videoLength: se.video_length ?? null,
       videoUrl: se.video_url ?? null,
       perSide: se.per_side ?? false,
       sets: (setsByExercise[se.id] ?? []).map((set: any) => ({
-        id: set.id, setNumber: set.set_number, reps: set.reps, weight: set.weight,
+        id: set.id, setNumber: set.set_number, reps: set.reps,
+        repsMin: set.reps_min ?? set.reps, repsMax: set.reps_max ?? set.reps, weight: set.weight,
         durationSeconds: set.duration_seconds ?? null,
       })),
     })),
@@ -402,6 +405,24 @@ export type CardioLog = { actualMinutes: number | null; done: boolean };
 
 // The patient's logged completion + actual minutes for a cardio session on a
 // given date (zone2 / vo2max). Null if nothing logged yet.
+export type WorkoutFeedback = { rpe: number | null; comment: string | null };
+
+export async function getWorkoutFeedback(
+  sessionId: string,
+  logDate: string
+): Promise<WorkoutFeedback | null> {
+  const user = await getUser();
+  if (!user) return null;
+  const [row] = await withAuth(user, (sql) =>
+    sql`SELECT rpe, comment
+        FROM session_feedback_logs
+        WHERE patient_id = ${user.id} AND session_id = ${sessionId} AND log_date = ${logDate}
+        LIMIT 1`
+  );
+  if (!row) return null;
+  return { rpe: row.rpe, comment: row.comment };
+}
+
 export async function getCardioLogForSession(
   sessionId: string,
   logDate: string
