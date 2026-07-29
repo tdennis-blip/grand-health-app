@@ -565,6 +565,29 @@ export const sessionFeedbackLogs = pgTable(
   })
 );
 
+// Patient-stated daily workout intent → feeds the diet "intent" mode goal.
+export const dailyActivityIntents = pgTable(
+  "daily_activity_intents",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clinicId: uuid("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
+    patientId: uuid("patient_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+    intentDate: date("intent_date").notNull(),
+    sessionId: uuid("session_id").references(() => sessionLibrary.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(), // strength|zone2|vo2max|mobility|custom
+    label: text("label"),
+    status: text("status").default("planned").notNull(), // planned|declined|done
+    expectedKcal: integer("expected_kcal"),
+    minutes: integer("minutes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    patientDateIdx: index("daily_activity_intents_patient_date_idx").on(t.patientId, t.intentDate),
+    clinicIdx: index("daily_activity_intents_clinic_idx").on(t.clinicId),
+  })
+);
+
 export const patientActivities = pgTable(
   "patient_activities",
   {

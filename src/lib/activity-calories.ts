@@ -36,7 +36,7 @@ export function kcalFromMet(metValue: number, weightKg: number, minutes: number)
   return Math.round(metValue * weightKg * (minutes / 60));
 }
 
-export type ActiveKcalSource = "wearable" | "estimated" | "none";
+export type ActiveKcalSource = "wearable" | "estimated" | "intent" | "none";
 
 export type ActiveKcalResult = {
   kcal: number;
@@ -115,6 +115,106 @@ export async function getActiveKcalForDate(
 
 function isoToday(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+// ── Intent-based active calories ────────────────────────────────────────────
+// Sum the patient's stated-intent activity for a date: prescribed sessions they
+// said they'd do (or already did) plus any custom activities. Declined sessions
+// contribute nothing. Used by the diet "intent" mode.
+export async function getIntentKcalForDate(
+  user: AuthUser,
+  dateIso: string
+): Promise<number> {
+  const rows = await withAuth(user, (sql) =>
+    sql`
+      SELECT COALESCE(SUM(expected_kcal), 0) AS total
+      FROM daily_activity_intents
+      WHERE patient_id = ${user.id}
+        AND intent_date = ${dateIso}
+        AND status <> 'declined'
+        AND expected_kcal IS NOT NULL
+    `
+  );
+  return Number((rows as any[])[0]?.total ?? 0);
+}
+
+export type ActivityIntentRow = {
+  id: string;
+  sessionId: string | null;
+  kind: string;
+  label: string | null;
+  status: "planned" | "declined" | "done";
+  expectedKcal: number | null;
+  minutes: number | null;
+};
+
+// The patient's saved intent rows for a date.
+export async function getDayIntents(user: AuthUser, dateIso: string): Promise<ActivityIntentRow[]> {
+  const rows = await withAuth(user, (sql) =>
+    sql`
+      SELECT id, session_id, kind, label, status, expected_kcal, minutes
+      FROM daily_activity_intents
+      WHERE patient_id = ${user.id} AND intent_date = ${dateIso}
+      ORDER BY created_at ASC
+    `
+  );
+  return (rows as any[]).map((r) => ({
+    id: r.id,
+    sessionId: r.session_id,
+    kind: r.kind,
+    label: r.label,
+    status: r.status,
+    expectedKcal: r.expected_kcal,
+    minutes: r.minutes,
+  }));
+}
+
+export type PrescribedSessionForDay = {
+  sessionId: string;
+  name: string;
+  kind: SessionKind;
+  estMinutes: number;
+  estKcal: number; // MET estimate for this patient's bodyweight
+};
+
+// The sessions prescribed for a given date (from the active program), with a
+// per-session MET calorie estimate — the menu for the daily check-in prompt.
+export async function getPrescribedSessionsForDate(
+  user: AuthUser,
+  dateIso: string,
+  weightKg: number | null
+): Promise<PrescribedSessionForDay[]> {
+  const dayKey = dateIso === isoToday() ? todayKey() : dayKeyForIso(dateIso);
+  const rows = await withAuth(user, (sql) =>
+    sql`
+      SELECT s.id, s.name, s.kind, s.est_minutes, s.met
+      FROM program_assignments pa
+      JOIN program_days pd ON pd.program_id = pa.program_id
+      JOIN session_library s ON s.id = pd.session_id
+      WHERE pa.patient_id = ${user.id}
+        AND pa.ended_at IS NULL
+        AND pd.day = ${dayKey}
+      ORDER BY s.name ASC
+    `
+  );
+  return (rows as any[]).map((r) => {
+    const kind = r.kind as SessionKind;
+    const minutes = Number(r.est_minutes) || 0;
+    const met = metForSession(kind, r.met == null ? null : Number(r.met));
+    return {
+      sessionId: r.id as string,
+      name: r.name as string,
+      kind,
+      estMinutes: minutes,
+      estKcal: kcalFromMet(met, weightKg ?? 0, minutes),
+    };
+  });
+}
+
+// Estimate kcal for a free-form activity from minutes, using a moderate MET
+// (~5.0) when the patient doesn't supply their own figure.
+export function estimateCustomKcal(weightKg: number | null, minutes: number, met = 5.0): number {
+  return kcalFromMet(met, weightKg ?? 0, minutes);
 }
 
 // Convenience wrapper using the current authed user.

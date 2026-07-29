@@ -4,9 +4,9 @@
 import { getUser } from "@/lib/auth/server";
 import { withAuth } from "@/lib/db/connection";
 import type { AuthUser } from "@/lib/auth/server";
-import { getActiveKcalForDate } from "@/lib/activity-calories";
+import { getActiveKcalForDate, getIntentKcalForDate } from "@/lib/activity-calories";
 
-export type ActivityMode = "static" | "dynamic" | "threshold";
+export type ActivityMode = "static" | "dynamic" | "threshold" | "intent";
 
 export type DietPlanRow = {
   rmrValue: number | null;
@@ -30,7 +30,7 @@ export type DietPlanRow = {
 // Optional per-day activity input for dynamic plans.
 export type ActivityInput = {
   activeKcal: number;                       // raw active calories for the day
-  source: "wearable" | "estimated" | "none";
+  source: "wearable" | "estimated" | "intent" | "none";
   provider?: string | null;
 };
 
@@ -54,7 +54,7 @@ export type DietTargets = {
   activeKcalRaw: number;       // measured/estimated active calories
   activeKcalCredited: number;  // portion actually added to the target
   activityCreditPct: number;
-  activitySource: "wearable" | "estimated" | "none";
+  activitySource: "wearable" | "estimated" | "intent" | "none";
   activityProvider: string | null;
   // Threshold-mode only: activity the multiplier already assumes. Calories
   // burned above this get added on top; at or below it, no adjustment.
@@ -72,10 +72,19 @@ export function deriveTargets(
   let activeKcalRaw = 0;
   let activeKcalCredited = 0;
   let activityThresholdKcal = 0;
-  let activitySource: "wearable" | "estimated" | "none" = "none";
+  let activitySource: "wearable" | "estimated" | "intent" | "none" = "none";
   let activityProvider: string | null = null;
 
-  if (plan.activityMode === "dynamic") {
+  if (plan.activityMode === "intent") {
+    // Patient-stated intent: near-sedentary resting base, then add the calories
+    // for the workouts they said they'd do today (credited fully). Avoids the
+    // double-count you'd get from a full activity multiplier + added activity.
+    baseKcal = Math.round(rmr * plan.baseMultiplier);
+    activeKcalRaw = activity?.activeKcal ?? 0;
+    activitySource = activity?.source ?? "none";
+    activityProvider = activity?.provider ?? null;
+    activeKcalCredited = activeKcalRaw;
+  } else if (plan.activityMode === "dynamic") {
     // Resting base from a near-sedentary multiplier, then add credited
     // activity calories so we don't double-count movement.
     baseKcal = Math.round(rmr * plan.baseMultiplier);
@@ -449,7 +458,7 @@ export async function getMyDietTargets(): Promise<{
 
   const [[profile], [plan]] = await Promise.all([
     withAuth(user, (sql) =>
-      sql`SELECT weight_kg FROM patient_profiles WHERE profile_id = ${user.id} LIMIT 1`
+      sql`SELECT weight_kg, diet_activity_planning FROM patient_profiles WHERE profile_id = ${user.id} LIMIT 1`
     ),
     withAuth(user, (sql) =>
       sql`SELECT * FROM diet_plans WHERE patient_id = ${user.id} LIMIT 1`
@@ -458,6 +467,9 @@ export async function getMyDietTargets(): Promise<{
 
   const weightKg = profile?.weight_kg ?? null;
   if (!plan) return { targets: null, weightKg };
+
+  // Patient opt-in overrides the clinician's mode with intent-based planning.
+  const patientWantsIntent = profile?.diet_activity_planning === true;
 
   const planRow: DietPlanRow = {
     rmrValue: plan.rmr_value,
@@ -473,16 +485,21 @@ export async function getMyDietTargets(): Promise<{
     mealsPerDay: plan.meals_per_day,
     waterL: Number(plan.water_l),
     notes: plan.notes,
-    activityMode: ((plan.activity_mode === "dynamic" || plan.activity_mode === "threshold")
-      ? plan.activity_mode
-      : "static") as ActivityMode,
+    activityMode: (patientWantsIntent
+      ? "intent"
+      : (plan.activity_mode === "dynamic" || plan.activity_mode === "threshold" || plan.activity_mode === "intent")
+        ? plan.activity_mode
+        : "static") as ActivityMode,
     baseMultiplier: Number(plan.base_multiplier ?? 1.2),
     activityCreditPct: Number(plan.activity_credit_pct ?? 50),
   };
 
   // Only spend a query on activity when the plan actually uses it.
   let activity: ActivityInput | null = null;
-  if (planRow.activityMode === "dynamic" || planRow.activityMode === "threshold") {
+  if (planRow.activityMode === "intent") {
+    const kcal = await getIntentKcalForDate(user, isoDate(new Date()));
+    activity = { activeKcal: kcal, source: "intent" };
+  } else if (planRow.activityMode === "dynamic" || planRow.activityMode === "threshold") {
     const res = await getActiveKcalForDate(user, isoDate(new Date()), weightKg);
     activity = { activeKcal: res.kcal, source: res.source, provider: res.provider };
   }

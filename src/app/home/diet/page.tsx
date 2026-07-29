@@ -17,10 +17,13 @@ import { FoodLogger } from "./food-logger";
 import { getSupplementMicrosForDate } from "@/lib/medications";
 import { AIDietPlan } from "./ai-plan";
 import { DietModeToggle, CollapsibleLogger } from "./diet-mode";
+import { getPrescribedSessionsForDate, getDayIntents } from "@/lib/activity-calories";
+import { ActivityCheckin } from "./activity-checkin";
+import { ActivityPlanningToggle } from "./activity-planning-toggle";
 
 export default async function PatientDiet() {
   const user = await requirePatient();
-  const { targets } = await getMyDietTargets();
+  const { targets, weightKg } = await getMyDietTargets();
   const todayIso = isoDate(new Date());
 
   const [recent, entries, favorites, recentFoods, suppMicros, [patientProfile]] = await Promise.all([
@@ -29,11 +32,26 @@ export default async function PatientDiet() {
     getFavoriteFoods(user, 12),
     getRecentFoods(user, 12),
     getSupplementMicrosForDate(user.id, todayIso, user),
-    withAuth(user, (sql) => sql`SELECT dietary_preferences, diet_view_mode FROM patient_profiles WHERE profile_id = ${user.id} LIMIT 1`),
+    withAuth(user, (sql) => sql`SELECT dietary_preferences, diet_view_mode, diet_activity_planning FROM patient_profiles WHERE profile_id = ${user.id} LIMIT 1`),
   ]);
 
   const hasPreferences = !!patientProfile?.dietary_preferences;
   const viewMode: "tracking" | "targets" = patientProfile?.diet_view_mode === "targets" ? "targets" : "tracking";
+  const planningOn = patientProfile?.diet_activity_planning === true;
+
+  // Data for the intent-mode daily activity check-in.
+  const intentActive = targets?.activityMode === "intent";
+  const [prescribedToday, dayIntents] = intentActive
+    ? await Promise.all([
+        getPrescribedSessionsForDate(user, todayIso, weightKg),
+        getDayIntents(user, todayIso),
+      ])
+    : [[], []];
+  const intentStatuses: Record<string, "planned" | "declined" | "done"> = {};
+  const customIntents = dayIntents
+    .filter((i) => i.sessionId == null)
+    .map((i) => ({ id: i.id, label: i.label ?? "Activity", expectedKcal: i.expectedKcal, minutes: i.minutes }));
+  dayIntents.forEach((i) => { if (i.sessionId) intentStatuses[i.sessionId] = i.status; });
 
   const foodTotals = sumTotals(entries);
   // Merge supplement micronutrients into food totals for the micro grid.
@@ -68,6 +86,8 @@ export default async function PatientDiet() {
         {targets && <DietModeToggle current={viewMode} />}
       </header>
 
+      {targets && <ActivityPlanningToggle enabled={planningOn} />}
+
       {!targets ? (
         <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-5 text-center">
           <div className="text-sm font-semibold text-slate-900">No diet plan yet</div>
@@ -85,12 +105,27 @@ export default async function PatientDiet() {
                 <span className="text-[9.5px] uppercase tracking-wide font-semibold bg-white/20 rounded-full px-2 py-0.5">
                   {targets.activitySource === "wearable"
                     ? `${targets.activityProvider ?? "wearable"} synced`
+                    : targets.activitySource === "intent"
+                    ? "your plan"
                     : "estimated"}
                 </span>
               )}
             </div>
             <div className="text-4xl font-semibold mt-1 tabular-nums">{targets.goalKcal.toLocaleString()}</div>
-            {targets.activityMode === "threshold" ? (
+            {targets.activityMode === "intent" ? (
+              <>
+                <div className="text-[12px] opacity-90 mt-1">
+                  Base {targets.baseKcal.toLocaleString()}
+                  {targets.activeKcalCredited > 0 && ` + ${targets.activeKcalCredited.toLocaleString()} planned activity`}
+                  {targets.deficitKcal !== 0 && ` · ${targets.deficitKcal > 0 ? "+" : ""}${targets.deficitKcal} kcal/day`}
+                </div>
+                <div className="text-[10.5px] opacity-80 mt-1">
+                  {targets.activeKcalCredited > 0
+                    ? "Reflects the workouts you said you'd do today."
+                    : "Plan today's activity below and your goal adjusts."}
+                </div>
+              </>
+            ) : targets.activityMode === "threshold" ? (
               <>
                 <div className="text-[12px] opacity-90 mt-1">
                   Base {targets.baseKcal.toLocaleString()}
@@ -135,8 +170,20 @@ export default async function PatientDiet() {
             )}
           </div>
 
-          {/* Calories burned today (wearable / estimated) — only for activity-aware plans */}
-          {targets.activityMode !== "static" && (
+          {/* Intent mode: the daily activity check-in drives the goal */}
+          {targets.activityMode === "intent" && (
+            <ActivityCheckin
+              logDate={todayIso}
+              weightKg={weightKg}
+              prescribed={prescribedToday}
+              initialStatuses={intentStatuses}
+              customs={customIntents}
+              plannedTotal={targets.activeKcalCredited}
+            />
+          )}
+
+          {/* Calories burned today (wearable / estimated) — dynamic/threshold plans */}
+          {targets.activityMode !== "static" && targets.activityMode !== "intent" && (
             <section className="bg-white rounded-2xl border border-slate-200 p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
