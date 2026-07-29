@@ -82,6 +82,37 @@ const zoneSchema = z.object({
   highBpm: z.number().int().min(40).max(220),
 });
 
+const addZoneSchema = z.object({
+  patientId: z.string().uuid(),
+  name: z.string().min(1).max(100),
+  shortName: z.string().min(1).max(10),
+  lowBpm: z.number().int().min(40).max(240),
+  highBpm: z.number().int().min(40).max(240),
+});
+
+// Add one zone manually (e.g. exact ranges read off a VO₂ machine).
+export async function addPatientZone(input: z.infer<typeof addZoneSchema>) {
+  const parsed = addZoneSchema.parse(input);
+  const user = await requireAccess(parsed.patientId);
+  const [last] = await withAuth(user, (sql) =>
+    sql`SELECT sort_order FROM hr_zones WHERE patient_id = ${parsed.patientId} ORDER BY sort_order DESC LIMIT 1`
+  );
+  const nextSort = (last?.sort_order ?? 0) + 1;
+  await withAuth(user, (sql) =>
+    sql`INSERT INTO hr_zones (clinic_id, patient_id, zone_key, name, short_name, low_bpm, high_bpm, sort_order)
+        VALUES (${user.clinicId}, ${parsed.patientId}, ${"z" + nextSort}, ${parsed.name}, ${parsed.shortName}, ${parsed.lowBpm}, ${parsed.highBpm}, ${nextSort})`
+  );
+  await recordAudit({ action: "create", entityType: "hr_zone", entityId: parsed.patientId, patientId: parsed.patientId });
+  revalidateHub(parsed.patientId);
+}
+
+export async function deletePatientZone(input: { patientId: string; id: string }) {
+  const user = await requireAccess(input.patientId);
+  await withAuth(user, (sql) => sql`DELETE FROM hr_zones WHERE id = ${input.id} AND patient_id = ${input.patientId}`);
+  await recordAudit({ action: "delete", entityType: "hr_zone", entityId: input.id, patientId: input.patientId });
+  revalidateHub(input.patientId);
+}
+
 export async function updatePatientZone(input: z.infer<typeof zoneSchema>) {
   const parsed = zoneSchema.parse(input);
   const user = await requireAccess(parsed.patientId);

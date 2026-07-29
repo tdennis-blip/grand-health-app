@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { Plus, Copy, Trash2, HeartPulse, Dumbbell, CalendarRange, Check } from "lucide-react";
 import {
-  seedPatientZones, updatePatientZone, generatePatientZones,
+  seedPatientZones, updatePatientZone, generatePatientZones, addPatientZone, deletePatientZone,
   createPatientSession, cloneSessionForPatient, deletePatientSession,
   createPatientProgram, clonePatientProgram, deletePatientProgram,
 } from "./actions";
@@ -52,29 +52,38 @@ function ZonesSection({ patientId, zones, hasGenericZones }: { patientId: string
         <HeartPulse size={16} className="text-rose-500" />
         <div className="text-sm font-semibold text-slate-900">HR zones for this patient</div>
       </div>
-      {zones.length === 0 ? (
-        <div className="space-y-3">
-          <div className="text-[13px] text-slate-500">
-            Enter this patient&apos;s max HR to generate their five zones, then fine-tune each range. Or copy the clinic defaults.
+      {zones.length > 0 && (
+        <div className="space-y-1.5">
+          <div className="grid grid-cols-12 gap-2 text-[10px] uppercase tracking-wide text-slate-500 font-semibold px-0.5">
+            <span className="col-span-1">Key</span>
+            <span className="col-span-4">Name</span>
+            <span className="col-span-2">Short</span>
+            <span className="col-span-4">Range (bpm)</span>
+            <span className="col-span-1"></span>
           </div>
-          <MaxHrGenerator patientId={patientId} label="Generate zones" />
+          {zones.map((z) => <ZoneRow key={z.id} patientId={patientId} zone={z} />)}
+          <div className="text-[11px] text-slate-400 pt-0.5">Type exact ranges (e.g. off your VO₂ machine). Saves on blur.</div>
+        </div>
+      )}
+
+      <AddZoneForm patientId={patientId} nextIndex={zones.length + 1} />
+
+      <details className="text-[12px]">
+        <summary className="cursor-pointer text-slate-500 hover:text-slate-700">Shortcuts: generate from max HR{hasGenericZones ? " · copy clinic zones" : ""}</summary>
+        <div className="mt-2 space-y-2 pl-1">
+          <MaxHrGenerator patientId={patientId} label={zones.length ? "Regenerate" : "Generate zones"} compact />
           {hasGenericZones && (
             <button
               onClick={() => startTransition(() => seedPatientZones({ patientId }))}
               disabled={pending}
               className="text-sm font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:border-slate-300 inline-flex items-center gap-1"
             >
-              <Copy size={13} /> Copy clinic zones instead
+              <Copy size={13} /> Copy clinic zones
             </button>
           )}
+          {zones.length > 0 && <div className="text-[11px] text-amber-600">Generate/copy replaces the zones above.</div>}
         </div>
-      ) : (
-        <div className="space-y-1.5">
-          {zones.map((z) => <ZoneRow key={z.id} patientId={patientId} zone={z} />)}
-          <div className="text-[11px] text-slate-400 pt-1">Edit each range directly (saves on blur), or regenerate from a max HR below.</div>
-          <div className="pt-1"><MaxHrGenerator patientId={patientId} label="Regenerate from max HR" compact /></div>
-        </div>
-      )}
+      </details>
     </section>
   );
 }
@@ -94,13 +103,61 @@ function ZoneRow({ patientId, zone }: { patientId: string; zone: Zone }) {
         className="col-span-4 text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-teal-500" />
       <input value={shortName} onChange={(e) => setShortName(e.target.value)} onBlur={save} disabled={pending}
         className="col-span-2 text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-teal-500" />
-      <div className="col-span-5 flex items-center gap-1">
+      <div className="col-span-4 flex items-center gap-1">
         <input type="number" value={lowBpm} onChange={(e) => setLowBpm(Number(e.target.value) || 0)} onBlur={save} disabled={pending}
-          className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 tabular-nums text-center focus:outline-none focus:border-teal-500" />
+          className="w-full text-sm border border-slate-200 rounded-lg px-1.5 py-1.5 tabular-nums text-center focus:outline-none focus:border-teal-500" />
         <span className="text-slate-400 text-xs">–</span>
         <input type="number" value={highBpm} onChange={(e) => setHighBpm(Number(e.target.value) || 0)} onBlur={save} disabled={pending}
-          className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 tabular-nums text-center focus:outline-none focus:border-teal-500" />
-        <span className="text-[10px] text-slate-400">bpm</span>
+          className="w-full text-sm border border-slate-200 rounded-lg px-1.5 py-1.5 tabular-nums text-center focus:outline-none focus:border-teal-500" />
+      </div>
+      <button
+        onClick={() => { if (confirm("Delete this zone?")) startTransition(() => deletePatientZone({ patientId, id: zone.id })); }}
+        disabled={pending}
+        className="col-span-1 text-rose-600 hover:bg-rose-50 rounded p-1 justify-self-center"
+        aria-label="Delete zone"
+      >
+        <Trash2 size={14} />
+      </button>
+    </div>
+  );
+}
+
+function AddZoneForm({ patientId, nextIndex }: { patientId: string; nextIndex: number }) {
+  const [name, setName] = useState("");
+  const [shortName, setShortName] = useState(`Z${nextIndex}`);
+  const [low, setLow] = useState("");
+  const [high, setHigh] = useState("");
+  const [pending, startTransition] = useTransition();
+
+  const lowN = parseInt(low, 10);
+  const highN = parseInt(high, 10);
+  const valid = name.trim() && shortName.trim() && lowN >= 40 && lowN <= 240 && highN >= 40 && highN <= 240;
+
+  const add = () => {
+    if (!valid) return;
+    startTransition(() => addPatientZone({ patientId, name: name.trim(), shortName: shortName.trim(), lowBpm: lowN, highBpm: highN }));
+    setName(""); setShortName(`Z${nextIndex + 1}`); setLow(""); setHigh("");
+  };
+
+  return (
+    <div className="border-t border-slate-100 pt-3">
+      <div className="text-[11px] uppercase tracking-wide text-slate-500 font-semibold mb-1.5">Add a zone manually</div>
+      <div className="grid grid-cols-12 gap-2 items-center">
+        <input value={shortName} onChange={(e) => setShortName(e.target.value)} placeholder="Z1"
+          className="col-span-2 text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-teal-500" />
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Threshold"
+          className="col-span-4 text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-teal-500" />
+        <div className="col-span-4 flex items-center gap-1">
+          <input type="number" value={low} onChange={(e) => setLow(e.target.value)} placeholder="low"
+            className="w-full text-sm border border-slate-200 rounded-lg px-1.5 py-1.5 tabular-nums text-center focus:outline-none focus:border-teal-500" />
+          <span className="text-slate-400 text-xs">–</span>
+          <input type="number" value={high} onChange={(e) => setHigh(e.target.value)} placeholder="high"
+            className="w-full text-sm border border-slate-200 rounded-lg px-1.5 py-1.5 tabular-nums text-center focus:outline-none focus:border-teal-500" />
+        </div>
+        <button onClick={add} disabled={pending || !valid}
+          className={`col-span-2 text-sm font-semibold px-2 py-1.5 rounded-lg inline-flex items-center justify-center gap-1 ${valid && !pending ? "bg-teal-700 text-white hover:bg-teal-800" : "bg-slate-200 text-slate-400 cursor-not-allowed"}`}>
+          <Plus size={13} /> Add
+        </button>
       </div>
     </div>
   );
