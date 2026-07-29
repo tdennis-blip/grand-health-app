@@ -70,10 +70,10 @@ export default async function SessionEditPage({ params }: { params: Promise<{ id
   return (
     <main className="max-w-4xl mx-auto px-6 py-6 space-y-6">
       <Link
-        href="/clinician/library/training/sessions"
+        href={session.patient_id ? `/clinician/patient/${session.patient_id}/training` : "/clinician/library/training/sessions"}
         className="text-sm text-teal-700 hover:text-teal-800 inline-flex items-center gap-1"
       >
-        &larr; Back to sessions
+        &larr; {session.patient_id ? "Back to patient training" : "Back to sessions"}
       </Link>
 
       <SessionEditor

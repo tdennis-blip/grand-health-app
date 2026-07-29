@@ -36,10 +36,10 @@ export default async function ProgramEditPage({ params }: { params: Promise<{ id
   return (
     <main className="max-w-4xl mx-auto px-6 py-6 space-y-6">
       <Link
-        href="/clinician/library/training/programs"
+        href={program.patient_id ? `/clinician/patient/${program.patient_id}/training` : "/clinician/library/training/programs"}
         className="text-sm text-teal-700 hover:text-teal-800 inline-flex items-center gap-1"
       >
-        &larr; Back to programs
+        &larr; {program.patient_id ? "Back to patient training" : "Back to programs"}
       </Link>
 
       <ProgramEditor
