@@ -11,6 +11,77 @@ import type { AuthUser } from "@/lib/auth/server";
 
 export type CardioWeek = { weekStart: string; zone2Min: number; vo2maxMin: number };
 
+// ── Adherence by modality (completed vs prescribed) ─────────────────────────
+export type ModalityAdherence = {
+  kind: "strength" | "zone2" | "vo2max" | "mobility";
+  label: string;
+  prescribed: number; // sessions the active program prescribes over the window
+  completed: number;  // distinct (session, date) the patient logged as done
+  pct: number | null; // completed/prescribed, capped 100; null if none prescribed
+};
+
+const MODALITY_LABEL: Record<ModalityAdherence["kind"], string> = {
+  strength: "Strength", zone2: "Zone 2", vo2max: "VO₂ max", mobility: "Movements & practices",
+};
+
+// Per-modality adherence over the last `weeks` weeks: how many prescribed
+// sessions of each modality the patient actually completed. Prescribed count =
+// (sessions of that kind per week in the active program) × weeks. Completed =
+// distinct (session, date) with a done log (strength/mobility → set logs;
+// zone2/vo2max → cardio logs).
+export async function getModalityAdherence(
+  user: AuthUser,
+  patientId: string,
+  weeks = 4
+): Promise<ModalityAdherence[] | null> {
+  const [assignment] = await withAuth(user, (sql) =>
+    sql`SELECT program_id FROM program_assignments WHERE patient_id = ${patientId} AND ended_at IS NULL ORDER BY assigned_at DESC LIMIT 1`
+  );
+  if (!assignment) return null;
+
+  const cutoff = new Date();
+  cutoff.setUTCDate(cutoff.getUTCDate() - weeks * 7);
+  const cutoffIso = cutoff.toISOString().slice(0, 10);
+
+  const [perWeek, strengthDone, cardioDone] = await Promise.all([
+    withAuth(user, (sql) =>
+      sql`SELECT s.kind, COUNT(*)::int AS n
+          FROM program_days pd JOIN session_library s ON s.id = pd.session_id
+          WHERE pd.program_id = ${assignment.program_id} GROUP BY s.kind`
+    ),
+    withAuth(user, (sql) =>
+      sql`SELECT s.kind, COUNT(DISTINCT esl.session_id::text || '|' || esl.log_date::text)::int AS n
+          FROM exercise_set_logs esl JOIN session_library s ON s.id = esl.session_id
+          WHERE esl.patient_id = ${patientId} AND esl.done = true AND esl.log_date >= ${cutoffIso}
+          GROUP BY s.kind`
+    ),
+    withAuth(user, (sql) =>
+      sql`SELECT s.kind, COUNT(DISTINCT csl.session_id::text || '|' || csl.log_date::text)::int AS n
+          FROM cardio_session_logs csl JOIN session_library s ON s.id = csl.session_id
+          WHERE csl.patient_id = ${patientId} AND csl.done = true AND csl.log_date >= ${cutoffIso}
+          GROUP BY s.kind`
+    ),
+  ]);
+
+  const prescribedByKind = new Map<string, number>();
+  (perWeek as any[]).forEach((r) => prescribedByKind.set(r.kind, Number(r.n) * weeks));
+  const completedByKind = new Map<string, number>();
+  [...(strengthDone as any[]), ...(cardioDone as any[])].forEach((r) => completedByKind.set(r.kind, Number(r.n)));
+
+  const kinds: ModalityAdherence["kind"][] = ["strength", "zone2", "vo2max", "mobility"];
+  return kinds.map((kind) => {
+    const prescribed = prescribedByKind.get(kind) ?? 0;
+    const completed = completedByKind.get(kind) ?? 0;
+    return {
+      kind,
+      label: MODALITY_LABEL[kind],
+      prescribed,
+      completed,
+      pct: prescribed > 0 ? Math.min(100, Math.round((completed / prescribed) * 100)) : null,
+    };
+  });
+}
+
 // Monday-anchored week start (YYYY-MM-DD) for a given date.
 function weekStartOf(d: Date): string {
   const dt = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));

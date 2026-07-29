@@ -7,6 +7,9 @@ import { AdherencePanel } from "./diet/adherence-panel";
 import { getRecentFoodLogs, buildDaySlots, deriveTargets } from "@/lib/diet";
 import { getBurnComparison } from "@/lib/diet-analytics";
 import { BurnComparisonPanel } from "./diet/burn-comparison-panel";
+import { getModalityAdherence } from "@/lib/training-analytics";
+import { ModalityAdherencePanel } from "./training/modality-adherence";
+import { PatientTabs } from "./patient-tabs";
 import { PillarManager } from "./pillar/pillar-manager";
 import { Grand100BaselineCard } from "./grand100/grand100-baseline-card";
 import { TargetAgesCard, type TargetRow } from "./grand100/target-ages-card";
@@ -148,6 +151,8 @@ export default async function PatientDetail({ params }: { params: Promise<{ id: 
       }, 21)
     : null;
 
+  const modalityAdherence = await getModalityAdherence(user, id, 4);
+
   const [assignments, programs] = await Promise.all([
     withAuth(user, (sql) =>
       sql`
@@ -193,79 +198,113 @@ export default async function PatientDetail({ params }: { params: Promise<{ id: 
 
       <WearableTrendCard patientId={id} />
 
-      <AdherencePanel slots={adherenceSlots} targets={adherenceTargets} />
-
-      <BurnComparisonPanel data={burnComparison} />
-
-      <DietPlanCard
-        patientId={id}
-        weightKg={patient.weight_kg}
-        initial={dietPlan ? {
-          rmrValue: dietPlan.rmr_value,
-          rmrMethod: dietPlan.rmr_method,
-          rmrMeasuredOn: dietPlan.rmr_measured_on
-            ? new Date(dietPlan.rmr_measured_on).toISOString().slice(0, 10)
-            : null,
-          rmrMeasuredBy: dietPlan.rmr_measured_by,
-          activityMultiplier: Number(dietPlan.activity_multiplier),
-          activityMode: (dietPlan.activity_mode === "dynamic" || dietPlan.activity_mode === "threshold") ? dietPlan.activity_mode : "static",
-          baseMultiplier: Number(dietPlan.base_multiplier ?? 1.2),
-          activityCreditPct: Number(dietPlan.activity_credit_pct ?? 50),
-          deficitKcal: dietPlan.deficit_kcal,
-          proteinPerKg: Number(dietPlan.protein_per_kg),
-          carbsPct: dietPlan.carbs_pct,
-          fatPct: dietPlan.fat_pct,
-          fiberG: dietPlan.fiber_g,
-          mealsPerDay: dietPlan.meals_per_day,
-          waterL: Number(dietPlan.water_l),
-          notes: dietPlan.notes,
-        } : null}
-      />
-
-      <Grand100BaselineCard
-        patientId={id}
-        initial={grand100Baseline ? {
-          vo2Now: grand100Baseline.vo2_now,
-          gripKg: grand100Baseline.grip_kg,
-          squat1rmLb: grand100Baseline.squat_1rm_lb,
-          strengthPercentile: grand100Baseline.strength_percentile,
-          mobilityPercentile: grand100Baseline.mobility_percentile,
-          measuredOn: grand100Baseline.measured_on,
-        } : null}
-        ageNow={ageFromDob(patient.date_of_birth)}
-        activities={baselineActivities}
-      />
-
-      <TargetAgesCard patientId={id} initial={targetRows} />
-
-      <StackSummaryCard patientId={id} />
-
-      <AppointmentsCard patientId={id} initial={patientAppointments} customTypes={customApptTypes} />
-
-      <Link
-        href={`/clinician/patient/${id}/training`}
-        className="flex items-center justify-between bg-white rounded-2xl border border-slate-200 px-5 py-4 hover:border-teal-300"
-      >
-        <div>
-          <div className="text-sm font-semibold text-slate-900">Training programs →</div>
-          <div className="text-[12px] text-slate-500">Build this patient&apos;s own zones, sessions, and programs — or clone from templates.</div>
-        </div>
-      </Link>
-
-      <ProgramAssignments
-        patientId={id}
-        assignments={assignments.map((a: any) => ({
-          id: a.id,
-          assignedAt: a.assigned_at,
-          endedAt: a.ended_at,
-          program: a.program_id ? { id: a.program_id, name: a.program_name, description: a.program_description } : null,
-        }))}
-        programs={programs.map((p: any) => ({ id: p.id, name: p.name }))}
-      />
-
-      <PillarManager
-        patientId={id}
-        pillars={(pillars || []).map((p: any) => ({ id: p.id, name: p.name, description: p.description, hidden: p.hidden }))}
+      <PatientTabs
+        tabs={[
+          {
+            id: "training",
+            label: "Training programs",
+            content: (
+              <>
+                <Link
+                  href={`/clinician/patient/${id}/training`}
+                  className="flex items-center justify-between bg-white rounded-2xl border border-slate-200 px-5 py-4 hover:border-teal-300"
+                >
+                  <div>
+                    <div className="text-sm font-semibold text-slate-900">Build training programs →</div>
+                    <div className="text-[12px] text-slate-500">This patient&apos;s own zones, sessions, and programs — or clone from templates.</div>
+                  </div>
+                </Link>
+                <ProgramAssignments
+                  patientId={id}
+                  assignments={assignments.map((a: any) => ({
+                    id: a.id,
+                    assignedAt: a.assigned_at,
+                    endedAt: a.ended_at,
+                    program: a.program_id ? { id: a.program_id, name: a.program_name, description: a.program_description } : null,
+                  }))}
+                  programs={programs.map((p: any) => ({ id: p.id, name: p.name }))}
+                />
+                <ModalityAdherencePanel data={modalityAdherence} weeks={4} />
+              </>
+            ),
+          },
+          {
+            id: "diet",
+            label: "Diet",
+            content: (
+              <>
+                <DietPlanCard
+                  patientId={id}
+                  weightKg={patient.weight_kg}
+                  initial={dietPlan ? {
+                    rmrValue: dietPlan.rmr_value,
+                    rmrMethod: dietPlan.rmr_method,
+                    rmrMeasuredOn: dietPlan.rmr_measured_on
+                      ? new Date(dietPlan.rmr_measured_on).toISOString().slice(0, 10)
+                      : null,
+                    rmrMeasuredBy: dietPlan.rmr_measured_by,
+                    activityMultiplier: Number(dietPlan.activity_multiplier),
+                    activityMode: (dietPlan.activity_mode === "dynamic" || dietPlan.activity_mode === "threshold") ? dietPlan.activity_mode : "static",
+                    baseMultiplier: Number(dietPlan.base_multiplier ?? 1.2),
+                    activityCreditPct: Number(dietPlan.activity_credit_pct ?? 50),
+                    deficitKcal: dietPlan.deficit_kcal,
+                    proteinPerKg: Number(dietPlan.protein_per_kg),
+                    carbsPct: dietPlan.carbs_pct,
+                    fatPct: dietPlan.fat_pct,
+                    fiberG: dietPlan.fiber_g,
+                    mealsPerDay: dietPlan.meals_per_day,
+                    waterL: Number(dietPlan.water_l),
+                    notes: dietPlan.notes,
+                  } : null}
+                />
+                <AdherencePanel slots={adherenceSlots} targets={adherenceTargets} />
+              </>
+            ),
+          },
+          {
+            id: "pillars",
+            label: "Pillars",
+            content: (
+              <PillarManager
+                patientId={id}
+                pillars={(pillars || []).map((p: any) => ({ id: p.id, name: p.name, description: p.description, hidden: p.hidden }))}
+              />
+            ),
+          },
+          {
+            id: "grand100",
+            label: "Grand100",
+            content: (
+              <>
+                <Grand100BaselineCard
+                  patientId={id}
+                  initial={grand100Baseline ? {
+                    vo2Now: grand100Baseline.vo2_now,
+                    gripKg: grand100Baseline.grip_kg,
+                    squat1rmLb: grand100Baseline.squat_1rm_lb,
+                    strengthPercentile: grand100Baseline.strength_percentile,
+                    mobilityPercentile: grand100Baseline.mobility_percentile,
+                    measuredOn: grand100Baseline.measured_on,
+                  } : null}
+                  ageNow={ageFromDob(patient.date_of_birth)}
+                  activities={baselineActivities}
+                />
+                <TargetAgesCard patientId={id} initial={targetRows} />
+                <BurnComparisonPanel data={burnComparison} />
+              </>
+            ),
+          },
+          {
+            id: "meds",
+            label: "Meds & supplements",
+            content: <StackSummaryCard patientId={id} />,
+          },
+          {
+            id: "appointments",
+            label: "Appointments",
+            content: <AppointmentsCard patientId={id} initial={patientAppointments} customTypes={customApptTypes} />,
+          },
+        ]}
       />
 
       <RemovePatientButton
