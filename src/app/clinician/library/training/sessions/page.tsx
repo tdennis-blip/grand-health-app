@@ -10,7 +10,7 @@ const KIND_STYLE: Record<SessionKind, { Icon: typeof Dumbbell; label: string; ba
   strength: { Icon: Dumbbell, label: "Strength", badge: "bg-blue-50 text-blue-700 border-blue-200",   tile: "from-blue-600 to-cyan-600" },
   zone2:    { Icon: Activity, label: "Zone 2",   badge: "bg-teal-50 text-teal-700 border-teal-200",   tile: "from-teal-500 to-cyan-600" },
   vo2max:   { Icon: Flame,    label: "VO₂ max",  badge: "bg-rose-50 text-rose-700 border-rose-200",   tile: "from-rose-500 to-red-600" },
-  mobility: { Icon: Sparkles, label: "Mobility", badge: "bg-amber-50 text-amber-700 border-amber-200",tile: "from-amber-500 to-orange-500" },
+  mobility: { Icon: Sparkles, label: "Movements & practices", badge: "bg-amber-50 text-amber-700 border-amber-200",tile: "from-amber-500 to-orange-500" },
 };
 
 export default async function SessionsPage() {

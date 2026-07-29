@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { Plus, Copy, Trash2, HeartPulse, Dumbbell, CalendarRange, Check } from "lucide-react";
 import {
-  seedPatientZones, updatePatientZone,
+  seedPatientZones, updatePatientZone, generatePatientZones,
   createPatientSession, cloneSessionForPatient, deletePatientSession,
   createPatientProgram, clonePatientProgram, deletePatientProgram,
 } from "./actions";
@@ -18,7 +18,7 @@ type PProgram = { id: string; name: string; description: string | null };
 type GProgram = { id: string; name: string };
 type Assignment = { id: string; programId: string; programName: string; ended: boolean };
 
-const KIND_LABEL: Record<Kind, string> = { strength: "Strength", zone2: "Zone 2", vo2max: "VO₂ max", mobility: "Mobility" };
+const KIND_LABEL: Record<Kind, string> = { strength: "Strength", zone2: "Zone 2", vo2max: "VO₂ max", mobility: "Movements & practices" };
 
 export function TrainingHub({
   patientId, zones, hasGenericZones,
@@ -53,26 +53,26 @@ function ZonesSection({ patientId, zones, hasGenericZones }: { patientId: string
         <div className="text-sm font-semibold text-slate-900">HR zones for this patient</div>
       </div>
       {zones.length === 0 ? (
-        <div className="text-[13px] text-slate-500">
-          {hasGenericZones
-            ? "No personal zones yet. Copy the clinic defaults to start, then adjust to this patient's max HR."
-            : "No clinic zones exist to copy. Set up generic zones in the Library first, or add this patient's zones manually later."}
+        <div className="space-y-3">
+          <div className="text-[13px] text-slate-500">
+            Enter this patient&apos;s max HR to generate their five zones, then fine-tune each range. Or copy the clinic defaults.
+          </div>
+          <MaxHrGenerator patientId={patientId} label="Generate zones" />
           {hasGenericZones && (
-            <div className="mt-2">
-              <button
-                onClick={() => startTransition(() => seedPatientZones({ patientId }))}
-                disabled={pending}
-                className="text-sm font-semibold px-3 py-1.5 rounded-lg bg-teal-700 text-white hover:bg-teal-800 inline-flex items-center gap-1"
-              >
-                <Copy size={13} /> Copy clinic zones
-              </button>
-            </div>
+            <button
+              onClick={() => startTransition(() => seedPatientZones({ patientId }))}
+              disabled={pending}
+              className="text-sm font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:border-slate-300 inline-flex items-center gap-1"
+            >
+              <Copy size={13} /> Copy clinic zones instead
+            </button>
           )}
         </div>
       ) : (
         <div className="space-y-1.5">
           {zones.map((z) => <ZoneRow key={z.id} patientId={patientId} zone={z} />)}
-          <div className="text-[11px] text-slate-400 pt-1">Edit to this patient&apos;s measured/estimated max HR. Saves on blur.</div>
+          <div className="text-[11px] text-slate-400 pt-1">Edit each range directly (saves on blur), or regenerate from a max HR below.</div>
+          <div className="pt-1"><MaxHrGenerator patientId={patientId} label="Regenerate from max HR" compact /></div>
         </div>
       )}
     </section>
@@ -102,6 +102,39 @@ function ZoneRow({ patientId, zone }: { patientId: string; zone: Zone }) {
           className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 tabular-nums text-center focus:outline-none focus:border-teal-500" />
         <span className="text-[10px] text-slate-400">bpm</span>
       </div>
+    </div>
+  );
+}
+
+function MaxHrGenerator({ patientId, label, compact }: { patientId: string; label: string; compact?: boolean }) {
+  const [maxHr, setMaxHr] = useState("");
+  const [pending, startTransition] = useTransition();
+  const n = parseInt(maxHr, 10);
+  const valid = n >= 100 && n <= 240;
+  const run = () => {
+    if (!valid) return;
+    if (compact && !confirm("Regenerate the five zones from this max HR? This replaces the current zones.")) return;
+    startTransition(() => generatePatientZones({ patientId, maxHr: n }));
+    setMaxHr("");
+  };
+  return (
+    <div className="flex items-end gap-2">
+      <label className="block">
+        <span className="text-[9.5px] uppercase tracking-wide text-slate-500 font-semibold">Max HR (bpm)</span>
+        <input
+          type="number" inputMode="numeric" value={maxHr}
+          onChange={(e) => setMaxHr(e.target.value)}
+          placeholder="e.g. 185"
+          className={`mt-0.5 ${compact ? "w-24" : "w-32"} text-sm border border-slate-200 rounded-lg px-2 py-1.5 tabular-nums focus:outline-none focus:border-teal-500`}
+        />
+      </label>
+      <button
+        onClick={run}
+        disabled={pending || !valid}
+        className={`text-sm font-semibold px-3 py-1.5 rounded-lg inline-flex items-center gap-1 ${valid && !pending ? "bg-teal-700 text-white hover:bg-teal-800" : "bg-slate-200 text-slate-400 cursor-not-allowed"}`}
+      >
+        <HeartPulse size={13} /> {label}
+      </button>
     </div>
   );
 }

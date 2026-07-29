@@ -24,7 +24,7 @@ const KIND_ICON = {
   strength: Dumbbell, zone2: Activity, vo2max: Flame, mobility: Sparkles,
 } as const;
 const KIND_LABEL = {
-  strength: "Strength", zone2: "Zone 2", vo2max: "VO₂ max", mobility: "Mobility",
+  strength: "Strength", zone2: "Zone 2", vo2max: "VO₂ max", mobility: "Movements & practices",
 } as const;
 const KIND_TILE = {
   strength: "from-blue-600 to-cyan-600",
@@ -254,7 +254,7 @@ export default async function PatientSessionDetail({
       {(session.kind === "strength" || session.kind === "mobility") && (
         <section className="space-y-2">
           <div className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold px-1">
-            {session.kind === "mobility" ? "Mobility moves" : "Exercises"}
+            {session.kind === "mobility" ? "Movements & practices" : "Exercises"}
           </div>
           {session.exercises.length === 0 && (
             <div className="text-sm text-slate-500 italic py-6 text-center bg-white rounded-xl border border-dashed border-slate-200">

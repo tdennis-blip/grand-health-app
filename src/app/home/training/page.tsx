@@ -16,7 +16,7 @@ const KIND_ICON = {
   strength: Dumbbell, zone2: Activity, vo2max: Flame, mobility: Sparkles,
 } as const;
 const KIND_LABEL = {
-  strength: "Strength", zone2: "Zone 2", vo2max: "VO₂ max", mobility: "Mobility",
+  strength: "Strength", zone2: "Zone 2", vo2max: "VO₂ max", mobility: "Movements & practices",
 } as const;
 const KIND_TILE = {
   strength: "from-blue-600 to-cyan-600",

@@ -317,7 +317,7 @@ function ExercisesSection({
 }) {
   const [pending, startTransition] = useTransition();
   const labels = kind === "mobility"
-    ? { round: "Round", reps: "Hold range (sec)", weight: "Reps / sides", add: "Add move", title: "Mobility moves in this flow" }
+    ? { round: "Round", reps: "Hold range (sec)", weight: "Reps / sides", add: "Add move", title: "Movements & practices in this session" }
     : { round: "Set",   reps: "Rep range",        weight: "Weight (lb)", add: "Add exercise", title: "Exercises in this session" };
 
   const noneInLibrary = exerciseLibrary.length === 0;

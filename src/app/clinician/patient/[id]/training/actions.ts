@@ -43,6 +43,36 @@ export async function seedPatientZones(input: { patientId: string }) {
   revalidateHub(input.patientId);
 }
 
+// Standard 5-zone model as % of max HR (low, high).
+const ZONE_MODEL: Array<{ zoneKey: string; name: string; shortName: string; lowPct: number; highPct: number }> = [
+  { zoneKey: "z1", name: "Recovery", shortName: "Z1", lowPct: 0.50, highPct: 0.60 },
+  { zoneKey: "z2", name: "Endurance", shortName: "Z2", lowPct: 0.60, highPct: 0.70 },
+  { zoneKey: "z3", name: "Tempo", shortName: "Z3", lowPct: 0.70, highPct: 0.80 },
+  { zoneKey: "z4", name: "Threshold", shortName: "Z4", lowPct: 0.80, highPct: 0.90 },
+  { zoneKey: "z5", name: "VO₂ max", shortName: "Z5", lowPct: 0.90, highPct: 1.00 },
+];
+
+// Generate (or regenerate) the patient's five HR zones from a max HR. Replaces
+// any existing patient zones so the provider gets a clean, editable set.
+export async function generatePatientZones(input: { patientId: string; maxHr: number }) {
+  const user = await requireAccess(input.patientId);
+  const maxHr = Math.round(input.maxHr);
+  if (!(maxHr >= 100 && maxHr <= 240)) throw new Error("Max HR must be between 100 and 240 bpm");
+
+  await withAuth(user, (sql) => sql`DELETE FROM hr_zones WHERE patient_id = ${input.patientId}`);
+  for (let i = 0; i < ZONE_MODEL.length; i++) {
+    const z = ZONE_MODEL[i];
+    const low = Math.round(maxHr * z.lowPct);
+    const high = Math.round(maxHr * z.highPct);
+    await withAuth(user, (sql) =>
+      sql`INSERT INTO hr_zones (clinic_id, patient_id, zone_key, name, short_name, low_bpm, high_bpm, sort_order)
+          VALUES (${user.clinicId}, ${input.patientId}, ${z.zoneKey}, ${z.name}, ${z.shortName}, ${low}, ${high}, ${i + 1})`
+    );
+  }
+  await recordAudit({ action: "create", entityType: "hr_zone", entityId: input.patientId, patientId: input.patientId, meta: { generatedFromMaxHr: maxHr } });
+  revalidateHub(input.patientId);
+}
+
 const zoneSchema = z.object({
   patientId: z.string().uuid(),
   id: z.string().uuid(),

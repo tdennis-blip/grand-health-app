@@ -10,7 +10,7 @@ const KIND_OPTIONS = [
   { id: "strength" as const, label: "Strength", Icon: Dumbbell, blurb: "Sets × reps × weight, with attached exercises.", active: "bg-blue-50 text-blue-900 border-blue-300" },
   { id: "zone2"    as const, label: "Zone 2",   Icon: Activity, blurb: "Steady aerobic block. Modality, duration, target zone.", active: "bg-teal-50 text-teal-900 border-teal-300" },
   { id: "vo2max"   as const, label: "VO₂ max",  Icon: Flame,    blurb: "Interval protocol. Warmup, rounds × work/recovery, cooldown.", active: "bg-rose-50 text-rose-900 border-rose-300" },
-  { id: "mobility" as const, label: "Mobility", Icon: Sparkles, blurb: "Flow with mobility exercises and hold times.", active: "bg-amber-50 text-amber-900 border-amber-300" },
+  { id: "mobility" as const, label: "Movements & practices", Icon: Sparkles, blurb: "Flow with movement work, mobility drills, and hold times.", active: "bg-amber-50 text-amber-900 border-amber-300" },
 ];
 
 export function NewSessionForm() {
@@ -55,7 +55,7 @@ export function NewSessionForm() {
           placeholder={
             kind === "vo2max" ? "Norwegian 4×4" :
             kind === "zone2" ? "Zone 2 Cycle" :
-            kind === "mobility" ? "Morning Mobility Flow" :
+            kind === "mobility" ? "Morning Movement Practice" :
             "Push Day"
           }
           className="mt-1 w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-teal-500"

@@ -79,7 +79,7 @@ function TargetsCard({ initial }: { initial: Targets }) {
           onChange={(v) => { setForm((p) => ({ ...p, vo2maxMinutesPerWeek: v })); setSaved(false); }}
           tone="rose"
           hint="Work-interval minutes only" />
-        <NumField label="Mobility snacks / wk"
+        <NumField label="Movement practices / wk"
           value={form.mobilityPerWeek}
           onChange={(v) => { setForm((p) => ({ ...p, mobilityPerWeek: v })); setSaved(false); }}
           tone="amber" />

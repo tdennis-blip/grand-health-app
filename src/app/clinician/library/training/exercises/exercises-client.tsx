@@ -107,7 +107,7 @@ function ExerciseRow({
         <div className="flex items-center gap-1.5">
           <div className="text-sm font-semibold text-slate-900 truncate">{ex.name}</div>
           <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${badge}`}>
-            {isMobility ? "Mobility" : "Strength"}
+            {isMobility ? "Movements & practices" : "Strength"}
           </span>
         </div>
         <div className="text-[11px] text-slate-500 truncate flex items-center gap-2">
@@ -174,7 +174,7 @@ function ExerciseDrawer({
             <div className="grid grid-cols-2 gap-2">
               {[
                 { id: "strength" as const, label: "Strength", Icon: Dumbbell, active: "bg-blue-50 text-blue-800 border-blue-300" },
-                { id: "mobility" as const, label: "Mobility", Icon: Sparkles, active: "bg-amber-50 text-amber-800 border-amber-300" },
+                { id: "mobility" as const, label: "Movements & practices", Icon: Sparkles, active: "bg-amber-50 text-amber-800 border-amber-300" },
               ].map((opt) => {
                 const Icon = opt.Icon;
                 const active = form.kind === opt.id;

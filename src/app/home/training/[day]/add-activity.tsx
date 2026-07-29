@@ -19,7 +19,7 @@ const KIND_LABEL: Record<Activity["kind"], string> = {
   vo2max: "VO₂ max",
   cardio: "Cardio",
   strength: "Strength",
-  mobility: "Mobility",
+  mobility: "Movements & practices",
 };
 
 type SetDraft = { reps: string; weight: string; seconds: string };

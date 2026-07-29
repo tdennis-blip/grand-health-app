@@ -26,7 +26,7 @@ const KIND_BADGE: Record<Kind, string> = {
 };
 
 const KIND_LABEL: Record<Kind, string> = {
-  strength: "Strength", zone2: "Zone 2", vo2max: "VO₂ max", mobility: "Mobility",
+  strength: "Strength", zone2: "Zone 2", vo2max: "VO₂ max", mobility: "Movements & practices",
 };
 
 type Session = {
@@ -222,7 +222,7 @@ export function ProgramEditor({
                     <optgroup label="VO₂ max">
                       {grouped.vo2max.map((s) => (<option key={s.id} value={s.id}>{s.name} (~{s.estMinutes}m)</option>))}
                     </optgroup>
-                    <optgroup label="Mobility">
+                    <optgroup label="Movements & practices">
                       {grouped.mobility.map((s) => (<option key={s.id} value={s.id}>{s.name} (~{s.estMinutes}m)</option>))}
                     </optgroup>
                   </select>
@@ -240,7 +240,7 @@ export function ProgramEditor({
           <SumCell label="Strength" value={`${strength}`} />
           <SumCell label="Zone 2"   value={`${zone2Min}m`} />
           <SumCell label="VO₂ max work" value={`${vo2Min}m`} />
-          <SumCell label="Mobility flows" value={`${mobility}`} />
+          <SumCell label="Movements & practices" value={`${mobility}`} />
           <SumCell label="Total time" value={`${totalMin}m`} />
         </div>
         <div className="text-[11px] text-slate-600 mt-3">

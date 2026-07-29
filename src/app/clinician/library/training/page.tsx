@@ -27,7 +27,7 @@ export default async function TrainingLibraryHome() {
     {
       href: "/clinician/library/training/sessions",
       label: "Sessions",
-      desc: "Named workouts — Strength, Zone 2, VO₂ max, Mobility flows.",
+      desc: "Named workouts — Strength, Zone 2, VO₂ max, Movements & practices.",
       Icon: Sparkles,
       count: sessionCount ?? 0,
       ready: true,
