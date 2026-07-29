@@ -5,6 +5,8 @@ import { ProgramAssignments } from "./program-assignments";
 import { DietPlanCard } from "./diet/diet-plan-card";
 import { AdherencePanel } from "./diet/adherence-panel";
 import { getRecentFoodLogs, buildDaySlots, deriveTargets } from "@/lib/diet";
+import { getBurnComparison } from "@/lib/diet-analytics";
+import { BurnComparisonPanel } from "./diet/burn-comparison-panel";
 import { PillarManager } from "./pillar/pillar-manager";
 import { Grand100BaselineCard } from "./grand100/grand100-baseline-card";
 import { TargetAgesCard, type TargetRow } from "./grand100/target-ages-card";
@@ -139,6 +141,13 @@ export default async function PatientDetail({ params }: { params: Promise<{ id: 
       })()
     : null;
 
+  const burnComparison = dietPlan
+    ? await getBurnComparison(user, id, {
+        rmrValue: dietPlan.rmr_value,
+        baseMultiplier: Number(dietPlan.base_multiplier ?? 1.2),
+      }, 21)
+    : null;
+
   const [assignments, programs] = await Promise.all([
     withAuth(user, (sql) =>
       sql`
@@ -185,6 +194,8 @@ export default async function PatientDetail({ params }: { params: Promise<{ id: 
       <WearableTrendCard patientId={id} />
 
       <AdherencePanel slots={adherenceSlots} targets={adherenceTargets} />
+
+      <BurnComparisonPanel data={burnComparison} />
 
       <DietPlanCard
         patientId={id}
