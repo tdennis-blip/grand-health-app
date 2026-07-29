@@ -22,9 +22,11 @@ CLUSTER="${CLUSTER:-grand-health-staging}"
 REGION="${AWS_REGION:-us-east-1}"
 
 echo "Reading stack outputs from $STACK ..."
+# Output keys are prefixed by the nested construct path (e.g.
+# AppRuntimeMigrateTaskDefArn...), so match by substring, not exact key.
 get_out() {
   aws cloudformation describe-stacks --stack-name "$STACK" --region "$REGION" \
-    --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text
+    --query "Stacks[0].Outputs[?contains(OutputKey, '$1')].OutputValue | [0]" --output text
 }
 TASKDEF=$(get_out MigrateTaskDefArn)
 SG=$(get_out MigrateSecurityGroupId)

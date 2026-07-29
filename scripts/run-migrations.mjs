@@ -27,7 +27,9 @@ if (!url) {
 }
 
 const migrationsDir = join(process.cwd(), "supabase", "migrations");
-const sql = postgres(url, { ssl: "require", max: 1, idle_timeout: 5 });
+// Suppress the postgres NOTICE firehose (mostly "drop ... if exists → skipping"
+// from idempotent guards) so the log shows just Applying/✓/Done lines.
+const sql = postgres(url, { ssl: "require", max: 1, idle_timeout: 5, onnotice: () => {} });
 
 async function applyOne(filename) {
   const path = join(migrationsDir, filename);
