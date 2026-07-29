@@ -21,7 +21,7 @@ export default async function ProgramsPage() {
 
   const [programRows, dayRows, assignmentRows] = await Promise.all([
     withAuth(user, (sql) =>
-      sql`SELECT id, name, description FROM program_library ORDER BY name ASC`
+      sql`SELECT id, name, description FROM program_library WHERE patient_id IS NULL ORDER BY name ASC`
     ),
     withAuth(user, (sql) =>
       sql`SELECT pd.program_id, pd.day, s.id AS session_id, s.name AS session_name, s.kind FROM program_days pd LEFT JOIN session_library s ON s.id = pd.session_id`

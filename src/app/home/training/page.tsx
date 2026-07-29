@@ -8,6 +8,7 @@ import {
   DAY_LABELS,
   DAY_KEYS,
   getRecentPatientActivities,
+  getPickableSessions,
 } from "@/lib/training";
 import { ActivityLogger } from "./[day]/add-activity";
 
@@ -42,6 +43,7 @@ export default async function PatientTrainingWeek() {
 
   const week = await getWeekSchedule(assignment.programId);
   const tKey = todayKey();
+  const pickable = await getPickableSessions();
 
   return (
     <main className="max-w-md mx-auto px-5 py-5 space-y-4">
@@ -111,6 +113,39 @@ export default async function PatientTrainingWeek() {
           );
         })}
       </section>
+
+      {pickable.length > 0 && (
+        <section className="space-y-1.5">
+          <div className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold px-1">Do another session</div>
+          <div className="text-[11px] text-slate-500 px-1 -mt-0.5 mb-1">Pick any session built for you or from the library — logs to today.</div>
+          {pickable.map((session) => {
+            const Icon = KIND_ICON[session.kind];
+            const gradient = KIND_TILE[session.kind];
+            return (
+              <Link
+                key={session.id}
+                href={`/home/training/${tKey}?s=${session.id}`}
+                className="block rounded-2xl border border-slate-200 bg-white p-3 flex items-center gap-3 hover:border-teal-300"
+              >
+                <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${gradient} text-white flex items-center justify-center flex-shrink-0`}>
+                  <Icon size={16} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-slate-900 truncate">{session.name}</div>
+                  <div className="text-[11px] text-slate-500 truncate">
+                    {KIND_LABEL[session.kind]} · {session.focus || `~${session.estMinutes}m`}
+                  </div>
+                </div>
+                <span className={`text-[9.5px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded-full ${
+                  session.source === "yours" ? "bg-teal-50 text-teal-700" : "bg-slate-100 text-slate-500"
+                }`}>
+                  {session.source === "yours" ? "For you" : "Library"}
+                </span>
+              </Link>
+            );
+          })}
+        </section>
+      )}
 
       <ActivityLogger
         day={tKey}

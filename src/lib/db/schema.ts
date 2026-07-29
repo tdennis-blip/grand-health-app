@@ -375,6 +375,7 @@ export const hrZones = pgTable(
     clinicId: uuid("clinic_id")
       .notNull()
       .references(() => clinics.id, { onDelete: "restrict" }),
+    patientId: uuid("patient_id").references(() => profiles.id, { onDelete: "cascade" }), // null = generic clinic zone
     zoneKey: text("zone_key").notNull(), // 'z1'..'z5'
     name: text("name").notNull(),
     shortName: text("short_name").notNull(),
@@ -432,6 +433,7 @@ export const sessionLibrary = pgTable(
     clinicId: uuid("clinic_id")
       .notNull()
       .references(() => clinics.id, { onDelete: "restrict" }),
+    patientId: uuid("patient_id").references(() => profiles.id, { onDelete: "cascade" }), // null = generic template
     kind: sessionKind("kind").default("strength").notNull(),
     name: text("name").notNull(),
     focus: text("focus"),
@@ -630,6 +632,7 @@ export const programLibrary = pgTable(
     clinicId: uuid("clinic_id")
       .notNull()
       .references(() => clinics.id, { onDelete: "restrict" }),
+    patientId: uuid("patient_id").references(() => profiles.id, { onDelete: "cascade" }), // null = generic template
     name: text("name").notNull(),
     description: text("description"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

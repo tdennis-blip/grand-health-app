@@ -8,7 +8,7 @@ export default async function ZonesPage() {
 
   const [zones, [targets]] = await Promise.all([
     withAuth(user, (sql) =>
-      sql`SELECT id, zone_key, name, short_name, low_bpm, high_bpm FROM hr_zones ORDER BY sort_order ASC`
+      sql`SELECT id, zone_key, name, short_name, low_bpm, high_bpm FROM hr_zones WHERE patient_id IS NULL ORDER BY sort_order ASC`
     ),
     withAuth(user, (sql) =>
       sql`SELECT strength_per_week, zone2_minutes_per_week, vo2max_minutes_per_week, mobility_per_week FROM training_targets WHERE clinic_id = ${user.clinicId} LIMIT 1`

@@ -103,6 +103,38 @@ export async function getWeekSchedule(programId: string): Promise<WeekSession[]>
   return DAY_KEYS.map((day) => ({ day, sessions: dayMap[day] }));
 }
 
+// Sessions a patient can choose to do ad-hoc: their own patient-specific
+// sessions plus the clinic's generic templates. Own sessions sort first.
+export type PickableSession = {
+  id: string;
+  kind: "strength" | "zone2" | "vo2max" | "mobility";
+  name: string;
+  focus: string | null;
+  estMinutes: number;
+  source: "yours" | "template";
+};
+
+export async function getPickableSessions(): Promise<PickableSession[]> {
+  const user = await getUser();
+  if (!user) return [];
+  const rows = await withAuth(user, (sql) =>
+    sql`
+      SELECT id, kind, name, focus, est_minutes, (patient_id IS NOT NULL) AS own
+      FROM session_library
+      WHERE patient_id = ${user.id} OR (patient_id IS NULL AND clinic_id = ${user.clinicId})
+      ORDER BY (patient_id IS NOT NULL) DESC, kind ASC, name ASC
+    `
+  );
+  return (rows as any[]).map((r) => ({
+    id: r.id,
+    kind: r.kind,
+    name: r.name,
+    focus: r.focus ?? null,
+    estMinutes: r.est_minutes,
+    source: r.own ? "yours" : "template",
+  }));
+}
+
 export type SessionDetail = {
   id: string;
   kind: "strength" | "zone2" | "vo2max" | "mobility";

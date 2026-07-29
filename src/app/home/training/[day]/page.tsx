@@ -67,7 +67,11 @@ export default async function PatientSessionDetail({
   const slot = week.find((w) => w.day === day);
   const daySessions = slot?.sessions ?? [];
 
-  if (daySessions.length === 0) {
+  // Ad-hoc: patient picked a session (their own or a generic template) that
+  // isn't necessarily scheduled today. RLS lets them read those sessions.
+  const adHoc = !!s && !daySessions.find((x) => x.id === s);
+
+  if (daySessions.length === 0 && !adHoc) {
     return (
       <main className="max-w-md mx-auto px-5 py-5 space-y-4">
         <Link href="/home/training" className="text-sm text-teal-700 inline-flex items-center gap-1">
@@ -86,8 +90,10 @@ export default async function PatientSessionDetail({
   }
 
   // Choose which session to show: explicit ?s=, otherwise the only one.
-  let picked = s ? daySessions.find((x) => x.id === s) : undefined;
+  let picked: { id: string } | undefined = s ? daySessions.find((x) => x.id === s) : undefined;
   if (!picked && daySessions.length === 1) picked = daySessions[0];
+  // Ad-hoc pick: load any session the patient can read, even if not scheduled.
+  if (!picked && adHoc) picked = { id: s as string };
 
   // Multiple sessions and none specified — let the patient pick.
   if (!picked) {

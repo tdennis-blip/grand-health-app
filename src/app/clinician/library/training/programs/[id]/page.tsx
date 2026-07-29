@@ -9,14 +9,16 @@ export default async function ProgramEditPage({ params }: { params: Promise<{ id
   const user = await requireClinician();
 
   const [program] = await withAuth(user, (sql) =>
-    sql`SELECT id, name, description FROM program_library WHERE id = ${id} LIMIT 1`
+    sql`SELECT id, patient_id, name, description FROM program_library WHERE id = ${id} LIMIT 1`
   );
   if (!program) notFound();
 
   const [days, sessions] = await Promise.all([
     withAuth(user, (sql) => sql`SELECT id, day, session_id, sort_order FROM program_days WHERE program_id = ${id} AND session_id IS NOT NULL ORDER BY sort_order ASC`),
+    // Session picker: generic templates always, plus this patient's own
+    // sessions when the program is patient-specific.
     withAuth(user, (sql) =>
-      sql`SELECT id, kind, name, est_minutes, duration_min, rounds, work_min FROM session_library ORDER BY kind ASC, name ASC`
+      sql`SELECT id, kind, name, est_minutes, duration_min, rounds, work_min FROM session_library WHERE patient_id IS NULL OR patient_id IS NOT DISTINCT FROM ${program.patient_id} ORDER BY (patient_id IS NOT NULL) DESC, kind ASC, name ASC`
     ),
   ]);
 

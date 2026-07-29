@@ -160,7 +160,7 @@ export default async function PatientDetail({ params }: { params: Promise<{ id: 
       `
     ),
     withAuth(user, (sql) =>
-      sql`SELECT id, name FROM program_library ORDER BY name ASC`
+      sql`SELECT id, name FROM program_library WHERE patient_id IS NULL ORDER BY name ASC`
     ),
   ]);
 
@@ -241,6 +241,16 @@ export default async function PatientDetail({ params }: { params: Promise<{ id: 
       <StackSummaryCard patientId={id} />
 
       <AppointmentsCard patientId={id} initial={patientAppointments} customTypes={customApptTypes} />
+
+      <Link
+        href={`/clinician/patient/${id}/training`}
+        className="flex items-center justify-between bg-white rounded-2xl border border-slate-200 px-5 py-4 hover:border-teal-300"
+      >
+        <div>
+          <div className="text-sm font-semibold text-slate-900">Training programs →</div>
+          <div className="text-[12px] text-slate-500">Build this patient&apos;s own zones, sessions, and programs — or clone from templates.</div>
+        </div>
+      </Link>
 
       <ProgramAssignments
         patientId={id}

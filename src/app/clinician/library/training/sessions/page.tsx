@@ -18,7 +18,7 @@ export default async function SessionsPage() {
 
   const [sessionRows, tzRows, wzRows, exerciseRows] = await Promise.all([
     withAuth(user, (sql) =>
-      sql`SELECT id, kind, name, focus, est_minutes, accent, modality, duration_min, rounds, work_min, recover_min, target_zone_id, work_zone_id FROM session_library ORDER BY kind ASC, name ASC`
+      sql`SELECT id, kind, name, focus, est_minutes, accent, modality, duration_min, rounds, work_min, recover_min, target_zone_id, work_zone_id FROM session_library WHERE patient_id IS NULL ORDER BY kind ASC, name ASC`
     ),
     withAuth(user, (sql) =>
       sql`SELECT id, short_name, low_bpm, high_bpm FROM hr_zones`
