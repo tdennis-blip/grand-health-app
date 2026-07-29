@@ -1,16 +1,22 @@
 #!/usr/bin/env bash
 # Run a staging DB migration via a one-off ECS Fargate task — NO bastion tunnel.
 #
-#   scripts/migrate-remote.sh 0040_something.sql
+#   scripts/migrate-remote.sh 0040_something.sql   # apply one file
+#   scripts/migrate-remote.sh --baseline           # adopt existing DB (run nothing)
+#   scripts/migrate-remote.sh --all                # apply all pending (tracked)
 #
-# Applies exactly one migration file (idempotent-safe). It fires the
-# `grand-health-staging-migrate` task in the web service's subnets + security
-# group (so RDS already trusts it), waits for it to finish, and prints its logs.
+# Fires the `grand-health-staging-migrate` task in the web service's subnets +
+# security group (so RDS already trusts it), waits, and prints its logs.
 #
 # Requires: the MigrateTask to exist (one-time `cd infra && npx cdk deploy ...`).
 set -euo pipefail
 
-FILE="${1:?usage: scripts/migrate-remote.sh <migration-file.sql>}"
+ARG="${1:?usage: scripts/migrate-remote.sh <file.sql> | --baseline | --all}"
+case "$ARG" in
+  --baseline) OVERRIDE_ENV='[{"name":"MIGRATE_MODE","value":"baseline"}]'; LABEL="baseline (record all files as applied)";;
+  --all)      OVERRIDE_ENV='[]'; LABEL="all pending";;
+  *)          OVERRIDE_ENV="[{\"name\":\"MIGRATE_FILE\",\"value\":\"$ARG\"}]"; LABEL="file $ARG";;
+esac
 STACK="${STACK:-GrandHealthStack}"
 CLUSTER="${CLUSTER:-grand-health-staging}"
 REGION="${AWS_REGION:-us-east-1}"
@@ -32,14 +38,14 @@ fi
 # CSV subnets -> JSON array element list
 SUBNET_JSON=$(printf '"%s",' ${SUBNETS//,/ }); SUBNET_JSON="[${SUBNET_JSON%,}]"
 
-echo "Launching migrate task for: $FILE"
+echo "Launching migrate task: $LABEL"
 TASK_ARN=$(aws ecs run-task \
   --cluster "$CLUSTER" --region "$REGION" \
   --task-definition "$TASKDEF" \
   --launch-type FARGATE \
   --count 1 \
   --network-configuration "awsvpcConfiguration={subnets=$SUBNET_JSON,securityGroups=[\"$SG\"],assignPublicIp=DISABLED}" \
-  --overrides "{\"containerOverrides\":[{\"name\":\"migrate\",\"environment\":[{\"name\":\"MIGRATE_FILE\",\"value\":\"$FILE\"}]}]}" \
+  --overrides "{\"containerOverrides\":[{\"name\":\"migrate\",\"environment\":$OVERRIDE_ENV}]}" \
   --query "tasks[0].taskArn" --output text)
 
 echo "Task: $TASK_ARN"

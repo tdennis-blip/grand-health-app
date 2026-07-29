@@ -6,6 +6,9 @@
 //   • MIGRATE_FILE=0040_x.sql  → apply exactly that one file (idempotent-safe,
 //     no state tracking). Mirrors the old `psql -f <file>` workflow. PREFERRED
 //     until schema_migrations has been baselined.
+//   • MIGRATE_MODE=baseline    → record EVERY *.sql file currently in the image
+//     as already-applied WITHOUT running any of them. Run this once to adopt an
+//     existing hand-migrated database; afterward apply-all only runs new files.
 //   • (no MIGRATE_FILE)        → apply every *.sql in supabase/migrations not yet
 //     recorded in public.schema_migrations, in filename order, each in its own
 //     transaction. For future auto-migrate-on-deploy.
@@ -49,6 +52,21 @@ async function main() {
       applied_at timestamptz not null default now()
     )
   `;
+
+  // Baseline: mark all present files as applied, run nothing.
+  if (process.env.MIGRATE_MODE === "baseline") {
+    const files = readdirSync(migrationsDir).filter((f) => f.endsWith(".sql")).sort();
+    for (const f of files) {
+      await sql`
+        insert into public.schema_migrations (filename)
+        values (${f})
+        on conflict (filename) do nothing
+      `;
+    }
+    console.log(`Baselined ${files.length} migration file(s) as applied (none executed):`);
+    for (const f of files) console.log(`  · ${f}`);
+    return;
+  }
 
   const single = process.env.MIGRATE_FILE;
   if (single) {
