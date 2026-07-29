@@ -283,6 +283,39 @@ export class AppRuntime extends Construct {
       })
     );
 
+    // ── One-off DB migration task (run via `aws ecs run-task`, no bastion) ────
+    // Reuses the app image but overrides the command to run the migration
+    // runner. It gets the OWNER role (SERVICE_ROLE_DATABASE_URL) as
+    // MIGRATE_DATABASE_URL. Run it in the web service's subnets + security group
+    // (see the CfnOutputs below) so RDS already permits the connection.
+    const migrateTask = new ecs.FargateTaskDefinition(this, "MigrateTask", {
+      cpu: 256,
+      memoryLimitMiB: 512,
+      family: `${this.serviceName}-migrate`,
+    });
+    migrateTask.addContainer("migrate", {
+      image: ecs.ContainerImage.fromEcrRepository(this.repository, "latest"),
+      command: ["node", "scripts/run-migrations.mjs"],
+      environment: { NODE_ENV: "production" },
+      secrets: {
+        MIGRATE_DATABASE_URL: ecs.Secret.fromSecretsManager(this.appEnvSecret, "SERVICE_ROLE_DATABASE_URL"),
+      },
+      logging: ecs.LogDrivers.awsLogs({ streamPrefix: "migrate", logGroup }),
+    });
+
+    new cdk.CfnOutput(this, "MigrateTaskDefArn", {
+      value: migrateTask.taskDefinitionArn,
+      description: "Task definition for the one-off DB migration task",
+    });
+    new cdk.CfnOutput(this, "MigrateSecurityGroupId", {
+      value: service.service.connections.securityGroups[0].securityGroupId,
+      description: "Security group RDS already trusts — use it when running the migrate task",
+    });
+    new cdk.CfnOutput(this, "MigrateSubnets", {
+      value: vpc.selectSubnets({ subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS }).subnetIds.join(","),
+      description: "Private-with-egress subnets for the migrate task",
+    });
+
     new cdk.CfnOutput(this, "AlbUrl", {
       value: domainName
         ? `https://${domainName}`

@@ -42,6 +42,13 @@ RUN addgroup --system --gid 1001 nodejs \
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+# Migration runner (used by the one-off ECS "migrate" task — see
+# infra/lib/app-runtime.ts). The standalone output doesn't trace these, so copy
+# them explicitly: the runner script, the .sql files, and postgres-js (a
+# zero-dependency module, so just its own directory is enough).
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/run-migrations.mjs ./scripts/run-migrations.mjs
+COPY --from=builder --chown=nextjs:nodejs /app/supabase/migrations ./supabase/migrations
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules/postgres ./node_modules/postgres
 USER nextjs
 EXPOSE 3000
 CMD ["node", "server.js"]
