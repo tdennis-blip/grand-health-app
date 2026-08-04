@@ -51,15 +51,29 @@ export default function LoginPage() {
       setView("forgotConfirm");
       setInfo(`We sent a 6-digit code to ${email.trim()}. Enter it below with your new password.`);
     } catch (err: unknown) {
-      // Don't reveal whether an account exists — generic guidance, still advance.
       const name = err instanceof Error ? err.name : "";
-      if (name === "LimitExceededException") {
-        setStatus("error");
-        setErrorMsg("Too many attempts. Please wait a few minutes and try again.");
-      } else {
+      const message = err instanceof Error ? err.message : "";
+      if (name === "UserNotFoundException") {
+        // Account doesn't exist. To avoid leaking which emails are registered,
+        // behave EXACTLY like the success path (generic message + advance).
         setStatus("idle");
         setView("forgotConfirm");
         setInfo(`If an account exists for ${email.trim()}, a code has been sent. Enter it below with your new password.`);
+      } else if (name === "LimitExceededException") {
+        setStatus("error");
+        setErrorMsg("Too many attempts. Please wait a few minutes and try again.");
+      } else if (name === "InvalidParameterException" || name === "NotAuthorizedException") {
+        // Account isn't in a resettable state — usually an invite that was never
+        // completed (still FORCE_CHANGE_PASSWORD), or a disabled login.
+        setStatus("error");
+        setErrorMsg("This account isn't ready for a password reset yet. If you were recently invited, use the link in your invitation email, or ask your clinic to resend the invite.");
+      } else {
+        // A GENUINE failure (email delivery, SES/config, or network). Surface it
+        // instead of falsely telling the user a code was sent — this swallow is
+        // what hid the SES misconfiguration.
+        console.error("Password reset request failed:", name, message);
+        setStatus("error");
+        setErrorMsg("We couldn't send a reset code right now. Please try again in a moment, or contact your clinic if this keeps happening.");
       }
     }
   };
