@@ -224,7 +224,7 @@ export default async function PatientDetail({ params }: { params: Promise<{ id: 
                   }))}
                   programs={programs.map((p: any) => ({ id: p.id, name: p.name }))}
                 />
-                <ModalityAdherencePanel data={modalityAdherence} weeks={4} />
+                <ModalityAdherencePanel data={modalityAdherence} weeks={4} href={`/clinician/patient/${id}/training/monitoring`} />
               </>
             ),
           },

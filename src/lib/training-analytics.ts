@@ -82,6 +82,177 @@ export async function getModalityAdherence(
   });
 }
 
+// ── Modality monitoring calendar (last N weeks) ─────────────────────────────
+// Per-day grid of prescribed vs. completed sessions, split by modality, with
+// per-session set/feedback detail so the clinician can drill into any training.
+export type ModalityKind = "strength" | "zone2" | "vo2max" | "mobility";
+
+export type MonitorSet = {
+  exercise: string;
+  setNumber: number;
+  target: string;
+  actual: string;
+  done: boolean;
+};
+
+export type MonitorItem = {
+  sessionId: string;
+  sessionName: string;
+  kind: ModalityKind;
+  prescribed: boolean; // scheduled by the active program on this weekday
+  done: boolean;       // patient logged it as done on this date
+  minutes: number | null; // cardio minutes, if any
+  rpe: number | null;
+  comment: string | null;
+  sets: MonitorSet[];
+};
+
+export type MonitorDay = { date: string; items: MonitorItem[] };
+export type MonitorCalendar = { days: MonitorDay[]; hasProgram: boolean };
+
+const DOW_KEY = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"]; // JS getUTCDay() index
+
+// Monday of the current week, in UTC.
+function thisMondayUtc(): Date {
+  const now = new Date();
+  const dt = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const dow = dt.getUTCDay();
+  const diff = dow === 0 ? 6 : dow - 1;
+  dt.setUTCDate(dt.getUTCDate() - diff);
+  return dt;
+}
+
+export async function getModalityCalendar(
+  user: AuthUser,
+  patientId: string,
+  weeks = 4
+): Promise<MonitorCalendar> {
+  const [assignment] = await withAuth(user, (sql) =>
+    sql`SELECT program_id FROM program_assignments WHERE patient_id = ${patientId} AND ended_at IS NULL ORDER BY assigned_at DESC LIMIT 1`
+  );
+
+  // Window: `weeks` Monday-anchored rows ending with the current week.
+  const start = thisMondayUtc();
+  start.setUTCDate(start.getUTCDate() - (weeks - 1) * 7);
+  const startIso = start.toISOString().slice(0, 10);
+
+  const [programDaysRows, strengthRows, cardioRows, feedbackRows] = await Promise.all([
+    assignment
+      ? withAuth(user, (sql) =>
+          sql`SELECT pd.day, s.id AS session_id, s.name AS session_name, s.kind
+              FROM program_days pd JOIN session_library s ON s.id = pd.session_id
+              WHERE pd.program_id = ${assignment.program_id} AND pd.session_id IS NOT NULL`
+        )
+      : Promise.resolve([] as any[]),
+    withAuth(user, (sql) =>
+      sql`SELECT to_char(esl.log_date, 'YYYY-MM-DD') AS d, esl.session_id, sl.name AS session_name, sl.kind,
+                 el.name AS exercise_name, ss.set_number,
+                 ss.reps AS target_reps, ss.reps_min AS target_reps_min, ss.reps_max AS target_reps_max, ss.weight AS target_weight,
+                 esl.actual_reps, esl.actual_weight, esl.done
+          FROM exercise_set_logs esl
+          JOIN session_sets ss ON ss.id = esl.set_id
+          JOIN session_exercises se ON se.id = ss.session_exercise_id
+          JOIN exercise_library el ON el.id = se.exercise_id
+          JOIN session_library sl ON sl.id = esl.session_id
+          WHERE esl.patient_id = ${patientId} AND esl.log_date >= ${startIso}
+          ORDER BY esl.log_date, sl.name, el.name, ss.set_number`
+    ),
+    withAuth(user, (sql) =>
+      sql`SELECT to_char(csl.log_date, 'YYYY-MM-DD') AS d, csl.session_id, sl.name AS session_name, sl.kind,
+                 csl.actual_minutes, csl.done
+          FROM cardio_session_logs csl JOIN session_library sl ON sl.id = csl.session_id
+          WHERE csl.patient_id = ${patientId} AND csl.log_date >= ${startIso}`
+    ),
+    withAuth(user, (sql) =>
+      sql`SELECT to_char(log_date, 'YYYY-MM-DD') AS d, session_id, rpe, comment
+          FROM session_feedback_logs
+          WHERE patient_id = ${patientId} AND log_date >= ${startIso}`
+    ),
+  ]);
+
+  // Prescribed sessions grouped by weekday key.
+  const prescribedByDow = new Map<string, { sessionId: string; sessionName: string; kind: ModalityKind }[]>();
+  for (const r of programDaysRows as any[]) {
+    const arr = prescribedByDow.get(r.day) ?? [];
+    arr.push({ sessionId: r.session_id, sessionName: r.session_name, kind: r.kind });
+    prescribedByDow.set(r.day, arr);
+  }
+
+  const feedbackByKey = new Map<string, { rpe: number | null; comment: string | null }>();
+  for (const f of feedbackRows as any[]) {
+    feedbackByKey.set(`${f.d}|${f.session_id}`, { rpe: f.rpe, comment: f.comment });
+  }
+
+  // Logged sessions per (date, sessionId): merge strength sets + cardio.
+  type Logged = { sessionName: string; kind: ModalityKind; done: boolean; minutes: number | null; sets: MonitorSet[] };
+  const loggedByKey = new Map<string, Logged>();
+
+  for (const r of strengthRows as any[]) {
+    const key = `${r.d}|${r.session_id}`;
+    const rec: Logged = loggedByKey.get(key) ?? { sessionName: r.session_name, kind: r.kind, done: false, minutes: null, sets: [] };
+    const target =
+      r.target_reps_min != null && r.target_reps_max != null && r.target_reps_min !== r.target_reps_max
+        ? `${r.target_reps_min}–${r.target_reps_max}×${r.target_weight}`
+        : `${r.target_reps_max ?? r.target_reps}×${r.target_weight}`;
+    const actual =
+      r.actual_reps != null || r.actual_weight != null
+        ? `${r.actual_reps ?? "–"}×${r.actual_weight ?? "–"}`
+        : "–";
+    rec.sets.push({ exercise: r.exercise_name, setNumber: r.set_number, target, actual, done: !!r.done });
+    if (r.done) rec.done = true;
+    loggedByKey.set(key, rec);
+  }
+
+  for (const r of cardioRows as any[]) {
+    const key = `${r.d}|${r.session_id}`;
+    const rec: Logged = loggedByKey.get(key) ?? { sessionName: r.session_name, kind: r.kind, done: false, minutes: null, sets: [] };
+    rec.minutes = r.actual_minutes != null ? Number(r.actual_minutes) : rec.minutes;
+    if (r.done) rec.done = true;
+    loggedByKey.set(key, rec);
+  }
+
+  // Emit each day in the window, oldest → newest.
+  const days: MonitorDay[] = [];
+  const totalDays = weeks * 7;
+  for (let i = 0; i < totalDays; i++) {
+    const d = new Date(start);
+    d.setUTCDate(d.getUTCDate() + i);
+    const iso = d.toISOString().slice(0, 10);
+    const dowKey = DOW_KEY[d.getUTCDay()];
+
+    // Union of prescribed sessions for this weekday and any sessions logged today.
+    const bySession = new Map<string, MonitorItem>();
+    for (const p of prescribedByDow.get(dowKey) ?? []) {
+      bySession.set(p.sessionId, {
+        sessionId: p.sessionId, sessionName: p.sessionName, kind: p.kind,
+        prescribed: true, done: false, minutes: null, rpe: null, comment: null, sets: [],
+      });
+    }
+    for (const [key, rec] of loggedByKey) {
+      if (!key.startsWith(`${iso}|`)) continue;
+      const sessionId = key.slice(iso.length + 1);
+      const existing = bySession.get(sessionId);
+      const fb = feedbackByKey.get(key);
+      if (existing) {
+        existing.done = rec.done;
+        existing.minutes = rec.minutes;
+        existing.sets = rec.sets;
+        existing.rpe = fb?.rpe ?? null;
+        existing.comment = fb?.comment ?? null;
+      } else {
+        bySession.set(sessionId, {
+          sessionId, sessionName: rec.sessionName, kind: rec.kind,
+          prescribed: false, done: rec.done, minutes: rec.minutes,
+          rpe: fb?.rpe ?? null, comment: fb?.comment ?? null, sets: rec.sets,
+        });
+      }
+    }
+    days.push({ date: iso, items: Array.from(bySession.values()) });
+  }
+
+  return { days, hasProgram: !!assignment };
+}
+
 // Monday-anchored week start (YYYY-MM-DD) for a given date.
 function weekStartOf(d: Date): string {
   const dt = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));

@@ -1,4 +1,5 @@
-import { Dumbbell, Activity, Flame, Sparkles } from "lucide-react";
+import Link from "next/link";
+import { Dumbbell, Activity, Flame, Sparkles, ChevronRight } from "lucide-react";
 import type { ModalityAdherence } from "@/lib/training-analytics";
 
 const ICON: Record<ModalityAdherence["kind"], typeof Dumbbell> = {
@@ -13,21 +14,30 @@ function barColor(pct: number): string {
 
 // Provider view: adherence to the prescribed program, split by modality, over
 // the last 4 weeks. Hidden when there's no active program.
-export function ModalityAdherencePanel({ data, weeks = 4 }: { data: ModalityAdherence[] | null; weeks?: number }) {
+export function ModalityAdherencePanel({ data, weeks = 4, href }: { data: ModalityAdherence[] | null; weeks?: number; href?: string }) {
+  const wrap = (inner: React.ReactNode) =>
+    href ? (
+      <Link href={href} className="block bg-white rounded-2xl border border-slate-200 p-5 hover:border-teal-300 transition-colors">
+        {inner}
+      </Link>
+    ) : (
+      <section className="bg-white rounded-2xl border border-slate-200 p-5">{inner}</section>
+    );
+
   if (!data) {
-    return (
-      <section className="bg-white rounded-2xl border border-slate-200 p-5">
-        <Header weeks={weeks} />
+    return wrap(
+      <>
+        <Header weeks={weeks} clickable={!!href} />
         <div className="mt-3 text-[13px] text-slate-500 italic">No active program assigned — adherence appears once a program is assigned.</div>
-      </section>
+      </>
     );
   }
 
   const anyPrescribed = data.some((d) => d.prescribed > 0);
 
-  return (
-    <section className="bg-white rounded-2xl border border-slate-200 p-5">
-      <Header weeks={weeks} />
+  return wrap(
+    <>
+      <Header weeks={weeks} clickable={!!href} />
       {!anyPrescribed ? (
         <div className="mt-3 text-[13px] text-slate-500 italic">The active program doesn&apos;t schedule any sessions yet.</div>
       ) : (
@@ -54,15 +64,22 @@ export function ModalityAdherencePanel({ data, weeks = 4 }: { data: ModalityAdhe
           })}
         </div>
       )}
-    </section>
+    </>
   );
 }
 
-function Header({ weeks }: { weeks: number }) {
+function Header({ weeks, clickable }: { weeks: number; clickable?: boolean }) {
   return (
-    <div>
-      <div className="text-sm font-semibold text-slate-900">Training adherence by modality</div>
-      <div className="text-[11px] text-slate-500">Completed vs. prescribed sessions over the last {weeks} weeks.</div>
+    <div className="flex items-start justify-between gap-2">
+      <div>
+        <div className="text-sm font-semibold text-slate-900">Training adherence by modality</div>
+        <div className="text-[11px] text-slate-500">Completed vs. prescribed sessions over the last {weeks} weeks.</div>
+      </div>
+      {clickable && (
+        <span className="text-[11px] text-teal-700 font-medium inline-flex items-center gap-0.5 whitespace-nowrap mt-0.5">
+          View details <ChevronRight size={13} />
+        </span>
+      )}
     </div>
   );
 }
