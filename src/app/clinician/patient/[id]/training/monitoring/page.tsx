@@ -1,19 +1,21 @@
 import Link from "next/link";
 import { requireClinician } from "@/lib/auth/server";
 import { withAuth } from "@/lib/db/connection";
-import { getModalityCalendar, getExercise1RMSeries } from "@/lib/training-analytics";
+import { getModalityCalendar, getExercise1RMSeries, getWeeklyCardioMinutes } from "@/lib/training-analytics";
 import { TrainingMonitor } from "./training-monitor";
+import { CardioMinutesPanel } from "./cardio-minutes-panel";
 
 export default async function PatientMonitoringPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await requireClinician();
 
-  const [[patient], calendar, oneRmSeries] = await Promise.all([
+  const [[patient], calendar, oneRmSeries, cardioWeeks] = await Promise.all([
     withAuth(user, (sql) =>
       sql`SELECT first_name, last_name FROM profiles WHERE id = ${id} LIMIT 1`
     ),
     getModalityCalendar(user, id, 4),
     getExercise1RMSeries(user, id),
+    getWeeklyCardioMinutes(user, id, 8),
   ]);
 
   const patientName = patient
@@ -31,6 +33,7 @@ export default async function PatientMonitoringPage({ params }: { params: Promis
         <div className="text-xs text-slate-500 mt-1">Prescribed vs. completed sessions by modality, with per-session detail and strength trends.</div>
       </header>
 
+      <CardioMinutesPanel weeks={cardioWeeks} />
       <TrainingMonitor days={calendar.days} hasProgram={calendar.hasProgram} exercises={oneRmSeries} />
     </main>
   );
