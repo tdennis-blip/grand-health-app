@@ -22,6 +22,23 @@ Full ordered runbook: `docs/deploy-staging-runbook.md`.
 
 ---
 
+## 📋 Session log 2026-08-06 — browser smoke tests (security/permissions + workout logging)
+
+Ran the two long-outstanding browser smoke tests against staging via Chrome. **Both substantively PASS; one bug found; two negatives left unverifiable (accounts no longer exist).**
+
+**Security / patient-deactivation (from 2026-07-14 review) — PASS:**
+- Logged in as admin clinician (Tobin Dennis). Audit-log nav visible (admin-only) ✓. Patient danger zone present with Resend invite / Deactivate / Delete permanently (admin-gated) ✓.
+- Deactivated the `tsdennis2@gmail.com` patient (Tobin's own patient-side account, used as the test subject): button flips to **Reactivate**, record still opens (retention) ✓. Roster shows **"Deactivated"** badge, dimmed, sorted to bottom ✓.
+- Signed out, attempted patient login while deactivated → **"user is disabled"** (Cognito login blocked at auth layer) ✓.
+- Reactivated → button back to **Deactivate**; account restored.
+- **⚠️ NOT verifiable now (test users gone):** the *non-admin clinician* visibility negatives (audit nav / staff toggle in Add patient / danger zone hidden from a non-admin) — `nurse@grandhealth.local` no longer exists and the only clinician is admin. Also the **TOTP-less clinician → `/mfa-setup` redirect** — every current clinician already has TOTP enrolled. Both need a fresh throwaway non-admin / un-enrolled clinician to test.
+
+**Workout logging end-to-end — PASS (verified on existing logged data):**
+- Clinician "View logged workouts →" (`/clinician/patient/[id]/workouts`) renders: weekly cardio-minutes chart (Zone 2 + VO₂ max), estimated 1-rep-max per exercise (Epley), and a **LOGGED SETS** table showing **actual vs prescribed** reps×weight per set (e.g. Push · Barbell Bench Press: #1 10×125→9×125 ✓, #2 15×155→15×157, #3 8×165→8×120). Prescribed-vs-actual pipeline confirmed working. (Skipped the fresh patient-side logging pass by choice — existing data already proves the loop.)
+- **🐛 BUG FOUND:** the LOGGED SETS card header shows **"Invalid Date"** instead of the session date. Set data is correct; only the date label fails to parse — likely a null/format issue on the logged-session timestamp in `workouts/training-charts.tsx` (or wherever the logged-sets group header is rendered). Low severity, cosmetic, but should be fixed.
+
+---
+
 ## ✅ RESOLVED 2026-08-06 — repo moved out of iCloud to `~/dev/grand-health-app`
 
 The recurring `index.lock` / `HEAD.lock` errors, SSM tunnel drops, and stale-nested-copy deploy bugs (the `team-manager.tsx` stale-snapshot incident, phantom tsc errors, triple-nested `grand-health-app/grand-health-app/`) all traced to the repo living under iCloud-synced `~/Desktop`. Repo now lives at **`~/dev/grand-health-app`** (directly in home → outside iCloud's Desktop/Documents sync). Verified healthy: on `main`, tracking `origin/main`, git clean, no `index.lock`. The old `~/Desktop/AI Projects/Grand Health/App` copy is a stale prototype stub and can be deleted. **Older "move to ~/dev" TODOs below are now DONE — ignore them.**
