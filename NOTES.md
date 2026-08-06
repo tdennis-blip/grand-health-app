@@ -22,6 +22,57 @@ Full ordered runbook: `docs/deploy-staging-runbook.md`.
 
 ---
 
+## ✅ RESOLVED 2026-08-06 — repo moved out of iCloud to `~/dev/grand-health-app`
+
+The recurring `index.lock` / `HEAD.lock` errors, SSM tunnel drops, and stale-nested-copy deploy bugs (the `team-manager.tsx` stale-snapshot incident, phantom tsc errors, triple-nested `grand-health-app/grand-health-app/`) all traced to the repo living under iCloud-synced `~/Desktop`. Repo now lives at **`~/dev/grand-health-app`** (directly in home → outside iCloud's Desktop/Documents sync). Verified healthy: on `main`, tracking `origin/main`, git clean, no `index.lock`. The old `~/Desktop/AI Projects/Grand Health/App` copy is a stale prototype stub and can be deleted. **Older "move to ~/dev" TODOs below are now DONE — ignore them.**
+
+---
+
+## ✅ RESOLVED 2026-07-30 — patient-specific training refactor + session-editor hang (fixed by 0043)
+
+Big training workflow refactor. **The blocking session-editor hang is now FIXED — see the ✅ note below.**
+
+**✅ SESSION-EDITOR HANG FIXED — migration `0043_training_child_rls_security_definer.sql` (APPLIED to staging 2026-07-30).**
+- **Why 0042 failed:** the CLINICIAN read on `session_exercises`/`session_sets` is gated by the ORIGINAL 0004 policies, whose `EXISTS (SELECT … FROM session_library …)` re-evaluates session_library's RLS per child row. Since 0040, session_library carries a RESTRICTIVE policy calling `clinician_can_access_patient()` plus the 0005 patient policy joining program_assignments→program_days → nested-policy blow-up. 0042 only dropped the *0040-added* child policies; it left the 0004 child policies AND the 0040 restrictive policy on session_library itself, so the whole nested path survived.
+- **Fix:** gate the child tables (session_exercises, session_sets, program_days) through **SECURITY DEFINER** helpers (`session_visible_to_current_user`, `session_exercise_visible_to_current_user`, `program_visible_to_current_user`). A definer function runs as the owner, which bypasses RLS, so the child reads no longer re-trigger session_library's policy stack. Reads are open to anyone who can see the parent; writes stay clinician-only (preserves 0004 semantics). Parent tables keep their 0040 policies (a single by-id read is cheap).
+- **Deploy note (bit us):** the tunnel-free migrate task pulls `grand-health-staging:latest` and reads migrations baked INTO the image — a brand-new `.sql` isn't found until it's in a pushed image. Order is always: commit/push → wait for CI to build+push `:latest` → then `scripts/migrate-remote.sh 0043_…sql`. (Legacy bastion tunnel can apply a purely-local file if ever needed.)
+
+
+
+**What shipped & is WORKING:**
+- **Patient-specific training** (migration `0040_patient_specific_training.sql`, APPLIED). Nullable `patient_id` on `session_library` / `program_library` / `hr_zones`: NULL = generic clinic template (Library), set = built for that patient. Care-team RLS: patients read own + generic; clinicians care-team-scoped for patient-specific rows (restrictive `ct_restrict_patient_owned`).
+- **Clinician per-patient training hub** at `/clinician/patient/[id]/training` (`training/page.tsx` + `training-hub.tsx` + `training/actions.ts`): per-patient HR zones (manual add/edit/delete + max-HR generator + copy-clinic), sessions (new or clone-from-template — deep-copies exercises/sets, remaps zones by zone_key), programs (new/clone + assign). Reuses the existing session/program editors (now owner-aware: zones + session picker branch on patient_id; back-links return to the hub).
+- **Library lists scoped to generic** (patient_id IS NULL) for sessions/programs/zones.
+- **HR zones now work** — needed migration `0041_hr_zones_patient_unique.sql` (APPLIED): the old `UNIQUE(clinic_id, zone_key)` blocked patient z1..z5; replaced with partial unique indexes (generic per clinic, patient per patient). Fixed the 23505 dup-key 500.
+- **Tabbed clinician patient view** (`patient-tabs.tsx`): demo/care-team/wearables pinned on top, then tabs Training / Diet / Pillars / Grand100 / Meds & supplements / Appointments; danger zone at bottom. New **modality adherence** panel (completed vs prescribed per modality, last 4 wks — `lib/training-analytics.ts getModalityAdherence` + `training/modality-adherence.tsx`).
+- **Rename** "Mobility" → **"Movements & practices"** across training UI (kind value stays `mobility`; grand100 mobility-level concept untouched).
+- Also fixed: session/program editor 500 from an untyped `IS NOT DISTINCT FROM` param (now branches on patient_id) — commit `5611a2b`.
+
+**✅ FIXED 2026-07-30 by migration 0043 (see the RESOLVED note at the top of this section) — historical diagnosis kept below for context:**
+- URL `/clinician/library/training/sessions/<id>` (e.g. `901370fa-53b1-4c91-b819-1786778e331b`). The RSC GET **hangs a long time, then dies with `net::ERR_HTTP2_PROTOCOL_ERROR` / "network error"**. **No exception in the app log** (`filter-log-events` clean) and ECS is at steady state → it's a DB query that never returns, not a crash. Only the session-editor page hits it (it's the only page reading `session_exercises` + `session_sets`); hub/patient pages are fine.
+- **Hypothesis:** nested RLS from 0040 on the child tables (`session_exercises`/`session_sets`/`program_days`) — their `EXISTS (SELECT … FROM session_library …)` predicates re-trigger session_library's own RLS per row → combinatorial blow-up.
+- **Tried `0042_training_rls_perf_fix.sql`** (dropped the 0040 child-table policies) — **DID NOT fix it** (deployed + migrated, still hangs). So either 0042 wasn't actually applied, OR the stall is elsewhere (session_library's own restrictive policy on a by-id read, the `exercise_library` query's 0005 patient policy, connection-pool/idle-in-txn from earlier failed requests, or a lock).
+- **NEXT STEP:** get the ACTUAL stuck query. Open the bastion tunnel (or a psql session) and while the hang is in flight run:
+  `SELECT pid, now()-query_start AS dur, state, wait_event_type, wait_event, left(query,300) FROM pg_stat_activity WHERE state <> 'idle' AND query NOT ILIKE '%pg_stat_activity%' ORDER BY dur DESC;`
+  That shows the exact query + whether it's blocked (wait_event) or just slow (long dur, no wait = the RLS explosion). Then: if RLS, rewrite the child/parent policies to use a **SECURITY DEFINER** helper `session_owner_patient_id(session_id)` (bypasses nested RLS); if a lock, find the blocker; if idle-in-transaction, check withAuth connection cleanup.
+- Verify first thing: confirm 0042 is actually in `schema_migrations` (`SELECT * FROM schema_migrations WHERE filename LIKE '004%';`) and the running image tag is current.
+
+**Deploy state:** migrations 0038–0042 all applied to staging via `scripts/migrate-remote.sh` (tunnel-free, baselined). Last confirmed image tag `e2a77cf87d95`; 0042 commit pushed after. Diagnostics that worked today: `aws logs filter-log-events --log-group-name /grand-health/staging/web --start-time <ms> --query "events[].message" --output text` (reliable; the per-stream get-log-events kept 404ing), and the ECS image-tag check via describe-services→describe-task-definition.
+
+---
+
+## 📋 Session log 2026-07-30 — session-editor RLS fix (0043), SES region trap fixed, forgot-password error surfacing
+
+Three things this session.
+
+**⭐ Session-editor hang FIXED — migration `0043_training_child_rls_security_definer.sql` (APPLIED to staging 2026-07-30).** See the ✅ RESOLVED block at the top of this file for the full root cause. Short version: 0042 didn't fix it because the CLINICIAN read uses the ORIGINAL 0004 child policies (EXISTS against session_library), and session_library still carried the 0040 restrictive policy — the nested-RLS path survived. 0043 gates the child tables through SECURITY DEFINER helpers (owner bypasses RLS → no nesting). Deploy gotcha learned: the tunnel-free migrate task reads migrations baked INTO the `:latest` image, so a new `.sql` must be committed/pushed (CI builds `:latest`) BEFORE `scripts/migrate-remote.sh` can find it.
+
+**⭐ SES REGION TRAP fixed — SES now correctly all in us-east-1.** The Cognito pool is us-east-1 and Cognito requires the SES identity in a region that pairs with the pool (us-east-1; us-east-2 is NOT valid). During the prod-access step the SES console had defaulted to **us-east-2**, so the identity/DKIM/MAIL-FROM and the production-access grant all got created there while us-east-1 was empty — i.e. Cognito was pointing at a us-east-1 identity that didn't exist (auth email broken). Fix: recreated the domain identity in **us-east-1** (new Easy DKIM CNAMEs in Squarespace, verified), set MAIL FROM `mail.mygrandhealth.com` (MX `feedback-smtp.us-east-1.amazonses.com` + SPF `v=spf1 include:amazonses.com ~all`, SUCCESS), requested + GRANTED production access in us-east-1 (`ProductionAccessEnabled: true`), and deleted the stray us-east-2 identities + their DNS records. **Rule going forward: always confirm the SES console/CLI region is us-east-1 before any SES work for this app.** The `mail.` MAIL FROM subdomain also closes the old "custom MAIL FROM for SPF alignment" follow-up.
+
+**Forgot-password error-swallow fixed (`src/app/login/page.tsx` `handleForgotRequest`).** Previously EVERY non-`LimitExceededException` error advanced to the code screen with "if an account exists, a code has been sent" — which hid genuine SES/config/network send failures (this is what masked the region breakage above). Now: `UserNotFoundException` keeps the generic message + advance (enumeration protection — this is the only case that would leak account existence); `InvalidParameterException`/`NotAuthorizedException` → "account isn't ready for a reset yet, use your invite / ask the clinic to resend" (the un-completed-invite case); anything else → a real error message + `console.error`, instead of a false success. Pure client code — no migration/cdk; ships via push→CI.
+
+---
+
 ## 📋 Session log 2026-07-29 — training upgrades, intent-based diet, tunnel-free migrations
 
 Three shipments + one infra change.
@@ -52,7 +103,7 @@ Three shipments + one infra change.
 
 **⚠️ Sequencing rule (for future SES/domain changes):** verify the SES identity in DNS **before** deploying the Cognito `withSES` change — Cognito email sends fail if the identity isn't verified at send time.
 
-**⏳ PENDING — SES production access (requested 2026-07-27, ~24h approval).** SES is still in the **sandbox**, so sends only reach **verified recipient addresses** until access is granted. Transactional use case submitted (Cognito invites + reset codes, <100/day, own users only). Once approved: do a live password-reset / resend-invite test → confirm email arrives **from info@mygrandhealth.com**. Until then, test by verifying a single recipient email identity in SES.
+**✅ DONE — SES production access LIVE (us-east-1).** Granted 2026-07-30; **verified live 2026-08-06: auth email delivers, sent from info@mygrandhealth.com**. No more sandbox recipient restrictions. (Historical: requested 2026-07-27; the region trap — stray us-east-2 grant — was fixed 2026-07-30, see that session log.)
 
 **⏳ Optional deliverability follow-up:** custom MAIL FROM subdomain (`mail.mygrandhealth.com`, MX + SPF TXT in Squarespace) for SPF alignment — not done. Also still open: fix the misleading error-swallow in `login/page.tsx` `handleForgotRequest` (surfaces "a code has been sent" even when ForgotPassword fails).
 
