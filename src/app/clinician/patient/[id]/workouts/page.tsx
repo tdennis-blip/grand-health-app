@@ -36,7 +36,7 @@ export default async function PatientWorkoutsPage({ params }: { params: Promise<
     ),
     withAuth(user, (sql) =>
       sql`
-        SELECT esl.log_date, esl.actual_reps, esl.actual_weight, esl.done,
+        SELECT esl.log_date::text AS log_date, esl.actual_reps, esl.actual_weight, esl.done,
                ss.set_number, ss.reps AS target_reps, ss.reps_min AS target_reps_min, ss.reps_max AS target_reps_max, ss.weight AS target_weight,
                el.name AS exercise_name, sl.name AS session_name
         FROM exercise_set_logs esl
@@ -51,7 +51,7 @@ export default async function PatientWorkoutsPage({ params }: { params: Promise<
     ),
     withAuth(user, (sql) =>
       sql`
-        SELECT sfl.log_date, sl.name AS session_name, sfl.rpe, sfl.comment
+        SELECT sfl.log_date::text AS log_date, sl.name AS session_name, sfl.rpe, sfl.comment
         FROM session_feedback_logs sfl
         JOIN session_library sl ON sl.id = sfl.session_id
         WHERE sfl.patient_id = ${id}
@@ -109,7 +109,12 @@ export default async function PatientWorkoutsPage({ params }: { params: Promise<
           {[...byDate.entries()].map(([date, exercises]) => (
             <section key={date} className="bg-white rounded-2xl border border-slate-200 p-5">
               <div className="text-sm font-semibold text-slate-900 mb-3">
-                {new Date(`${date}T00:00:00`).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+                {(() => {
+                  const d = new Date(`${date}T00:00:00`);
+                  return isNaN(d.getTime())
+                    ? "Undated"
+                    : d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+                })()}
               </div>
 
               {(feedbackByDate.get(date) ?? []).map((f, i) => (
